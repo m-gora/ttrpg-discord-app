@@ -18,6 +18,10 @@ export interface Session {
   messageId: string;
   /** Array of user IDs who have RSVPd */
   rsvps: string[];
+  /** Whether a reschedule poll is currently active */
+  rescheduleActive: boolean;
+  /** Discord message ID of the active reschedule poll */
+  rescheduleMessageId: string;
   /** Whether the 1-day-before reminder has been sent */
   reminded24h: boolean;
   /** Whether the "starting now" reminder has been sent */

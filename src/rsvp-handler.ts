@@ -1,13 +1,15 @@
-import { type ButtonInteraction } from "discord.js";
+import { type ButtonInteraction, type SendableChannels } from "discord.js";
 import { getSessions, updateSession } from "./sessions";
 import {
   RSVP_BUTTON_PREFIX,
   buildSessionCard,
   countChannelMembers,
 } from "./session-card";
+import { openReschedulePoll } from "./reschedule-poll";
 
 /**
  * Handle an RSVP button click: toggle the user's RSVP and update the card.
+ * If someone un-RSVPs (declines), a reschedule poll is opened.
  */
 export async function handleRsvpButton(
   interaction: ButtonInteraction,
@@ -55,4 +57,13 @@ export async function handleRsvpButton(
 
   // Update the original message with the new embed
   await interaction.update({ embeds: [embed], components: [row] });
+
+  // If someone declined (un-RSVPd), open a reschedule poll
+  if (alreadyRsvpd && !session.rescheduleActive) {
+    await openReschedulePoll(
+      channel as SendableChannels,
+      session,
+      interaction.user.displayName,
+    );
+  }
 }

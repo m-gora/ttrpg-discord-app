@@ -2,6 +2,7 @@ import cron from "node-cron";
 import { Client, EmbedBuilder, time } from "discord.js";
 import type { SendableChannels } from "discord.js";
 import { getSessions, updateSession, removeSession } from "./sessions";
+import { checkReschedulePolls } from "./reschedule-poll";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const FIVE_MIN_MS = 5 * 60 * 1000;
@@ -14,6 +15,7 @@ export function startScheduler(client: Client) {
   cron.schedule("* * * * *", async () => {
     try {
       await checkReminders(client);
+      await checkReschedulePolls(client);
     } catch (err) {
       console.error("[scheduler] Error checking reminders:", err);
     }

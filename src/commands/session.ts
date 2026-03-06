@@ -113,6 +113,8 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
     createdBy: interaction.user.id,
     messageId: "", // will be set after sending
     rsvps: [] as string[],
+    rescheduleActive: false,
+    rescheduleMessageId: "",
     reminded24h: false,
     remindedStart: false,
   };

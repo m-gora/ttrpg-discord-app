@@ -1,23 +1,30 @@
 import { type ButtonInteraction, type SendableChannels } from "discord.js";
-import { getSessions, updateSession } from "./sessions";
+import { type Session, getSessions, updateSession } from "./sessions";
 import {
-  RSVP_BUTTON_PREFIX,
+  ATTEND_BUTTON_PREFIX,
+  DECLINE_BUTTON_PREFIX,
   buildSessionCard,
   countChannelMembers,
 } from "./session-card";
 import { openReschedulePoll } from "./reschedule-poll";
 
 /**
- * Handle an RSVP button click: toggle the user's RSVP and update the card.
- * If someone un-RSVPs (declines), a reschedule poll is opened.
+ * Handle Attend / Don't Attend button clicks.
+ * - "Attend" adds the user to rsvps (removes from declined if present).
+ * - "Don't Attend" adds the user to declined (removes from rsvps if present)
+ *   and triggers a reschedule poll on the first cancellation.
  */
 export async function handleRsvpButton(
   interaction: ButtonInteraction,
 ): Promise<void> {
   const customId = interaction.customId;
-  if (!customId.startsWith(RSVP_BUTTON_PREFIX)) return;
 
-  const sessionId = customId.slice(RSVP_BUTTON_PREFIX.length);
+  const isAttend = customId.startsWith(ATTEND_BUTTON_PREFIX);
+  const isDecline = customId.startsWith(DECLINE_BUTTON_PREFIX);
+  if (!isAttend && !isDecline) return;
+
+  const prefix = isAttend ? ATTEND_BUTTON_PREFIX : DECLINE_BUTTON_PREFIX;
+  const sessionId = customId.slice(prefix.length);
   const sessions = await getSessions();
   const session = sessions.find((s) => s.id === sessionId);
 
@@ -29,24 +36,32 @@ export async function handleRsvpButton(
     return;
   }
 
-  const userId = interaction.user.id;
-  const alreadyRsvpd = session.rsvps.includes(userId);
+  // Ensure the declined array exists (backward compat with old data)
+  if (!Array.isArray(session.declined)) session.declined = [];
 
-  if (alreadyRsvpd) {
-    session.rsvps = session.rsvps.filter((id) => id !== userId);
+  const userId = interaction.user.id;
+
+  if (isAttend) {
+    const earlyReply = handleAttend(session, userId);
+    if (earlyReply) {
+      await interaction.reply({ content: earlyReply, ephemeral: true });
+      return;
+    }
   } else {
-    session.rsvps.push(userId);
+    const earlyReply = await handleDecline(session, userId, interaction);
+    if (earlyReply) {
+      await interaction.reply({ content: earlyReply, ephemeral: true });
+      return;
+    }
   }
 
   await updateSession(session);
 
-  // Rebuild the embed with updated RSVP info
+  // Rebuild the embed with updated info
   const channel = interaction.channel;
   if (!channel) {
     await interaction.reply({
-      content: alreadyRsvpd
-        ? "🔕 Your RSVP has been removed."
-        : "🎟️ You've RSVPd!",
+      content: isAttend ? "✅ You're attending!" : "❌ Marked as can't make it.",
       ephemeral: true,
     });
     return;
@@ -54,16 +69,43 @@ export async function handleRsvpButton(
 
   const memberCount = await countChannelMembers(channel);
   const { embed, row } = buildSessionCard(session, memberCount);
-
-  // Update the original message with the new embed
   await interaction.update({ embeds: [embed], components: [row] });
+}
 
-  // If someone declined (un-RSVPd), open a reschedule poll
-  if (alreadyRsvpd && !session.rescheduleActive) {
+/** Returns an ephemeral reply string if the user is already attending, or null to continue. */
+function handleAttend(session: Session, userId: string): string | null {
+  if (session.rsvps.includes(userId)) {
+    return "You're already marked as attending!";
+  }
+  session.declined = session.declined.filter((id) => id !== userId);
+  session.rsvps.push(userId);
+  return null;
+}
+
+/** Returns an ephemeral reply string if the user already declined, or null to continue. */
+async function handleDecline(
+  session: Session,
+  userId: string,
+  interaction: ButtonInteraction,
+): Promise<string | null> {
+  if (session.declined.includes(userId)) {
+    return "You've already indicated you can't make it.";
+  }
+
+  session.rsvps = session.rsvps.filter((id) => id !== userId);
+  session.declined.push(userId);
+
+  // Save so the reschedule poll sees updated state
+  await updateSession(session);
+
+  // Trigger reschedule poll on the first cancellation
+  if (!session.rescheduleActive && interaction.channel) {
     await openReschedulePoll(
-      channel as SendableChannels,
+      interaction.channel as SendableChannels,
       session,
       interaction.user.displayName,
     );
   }
+
+  return null;
 }

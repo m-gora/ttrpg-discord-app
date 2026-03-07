@@ -126,6 +126,7 @@ async function processReschedulePoll(
   session.rescheduleActive = false;
   session.rescheduleMessageId = "";
   session.rsvps = [];
+  session.declined = [];
   session.reminded24h = false;
   session.remindedStart = false;
   await updateSession(session);

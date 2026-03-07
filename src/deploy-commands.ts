@@ -7,8 +7,9 @@
 import { REST, Routes } from "discord.js";
 import { CONFIG } from "./config";
 import { data as sessionCommand } from "./commands/session";
+import { data as campaignCommand } from "./commands/campaign";
 
-const commands = [sessionCommand.toJSON()];
+const commands = [sessionCommand.toJSON(), campaignCommand.toJSON()];
 
 const rest = new REST({ version: "10" }).setToken(CONFIG.TOKEN);
 

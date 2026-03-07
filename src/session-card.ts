@@ -10,11 +10,13 @@ import {
 } from "discord.js";
 import type { Session } from "./sessions";
 
-/** Custom ID prefix used for the RSVP button */
-export const RSVP_BUTTON_PREFIX = "rsvp_";
+/** Custom ID prefix used for the Attend button */
+export const ATTEND_BUTTON_PREFIX = "attend_";
+/** Custom ID prefix used for the Decline button */
+export const DECLINE_BUTTON_PREFIX = "decline_";
 
 /**
- * Build the session card embed and RSVP action row.
+ * Build the session card embed and Attend / Don't Attend action row.
  * `memberCount` is the total number of (non-bot) members in the channel.
  */
 export function buildSessionCard(
@@ -22,38 +24,58 @@ export function buildSessionCard(
   memberCount: number,
 ): { embed: EmbedBuilder; row: ActionRowBuilder<ButtonBuilder> } {
   const d = new Date(session.date);
-  const rsvpCount = session.rsvps.length;
+  const attendCount = session.rsvps.length;
+  const declinedCount = (session.declined ?? []).length;
 
-  const rsvpList =
-    rsvpCount > 0
+  const attendList =
+    attendCount > 0
       ? session.rsvps.map((uid) => `<@${uid}>`).join(", ")
-      : "*No RSVPs yet*";
+      : "*No one yet*";
 
-  const embed = new EmbedBuilder()
-    .setTitle(`🎲 ${session.title}`)
-    .setColor(0x5865f2)
-    .addFields(
+  const declinedList =
+    declinedCount > 0
+      ? (session.declined ?? []).map((uid) => `<@${uid}>`).join(", ")
+      : "*—*";
+
+  const fields = [
       {
         name: "📅 Date",
         value: `${time(d, "F")} (${time(d, "R")})`,
       },
       {
-        name: `✅ RSVP — ${rsvpCount}/${memberCount}`,
-        value: rsvpList,
+        name: `✅ Attending — ${attendCount}/${memberCount}`,
+        value: attendList,
       },
-      { name: "ID", value: `\`${session.id}\``, inline: true },
-    )
+      {
+        name: `❌ Can't Make It — ${declinedCount}`,
+        value: declinedList,
+      },
+    ];
+
+  if (session.vttLink) {
+    fields.push({ name: "🗺️ VTT", value: session.vttLink });
+  }
+
+  fields.push({ name: "ID", value: `\`${session.id}\``, inline: true } as any);
+
+  const embed = new EmbedBuilder()
+    .setTitle(`🎲 ${session.title}`)
+    .setColor(0x5865f2)
+    .addFields(...fields)
     .setFooter({ text: `Created by` })
     .setTimestamp(d);
 
   const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
     new ButtonBuilder()
-      .setCustomId(`${RSVP_BUTTON_PREFIX}${session.id}`)
-      .setLabel(
-        rsvpCount > 0 ? `RSVP (${rsvpCount}/${memberCount})` : "RSVP",
-      )
-      .setStyle(ButtonStyle.Primary)
-      .setEmoji("🎟️"),
+      .setCustomId(`${ATTEND_BUTTON_PREFIX}${session.id}`)
+      .setLabel(`Attend (${attendCount})`)
+      .setStyle(ButtonStyle.Success)
+      .setEmoji("✅"),
+    new ButtonBuilder()
+      .setCustomId(`${DECLINE_BUTTON_PREFIX}${session.id}`)
+      .setLabel(`Can't Make It (${declinedCount})`)
+      .setStyle(ButtonStyle.Danger)
+      .setEmoji("❌"),
   );
 
   return { embed, row };
@@ -75,10 +97,11 @@ export async function countChannelMembers(
     ).size;
   }
 
-  // Group DM – recipients is an array of PartialRecipient
+  // Group DM – recipients is a Collection of PartialRecipient (excludes the client user)
   if (channel.type === ChannelType.GroupDM && "recipients" in channel) {
-    const recipients = (channel as unknown as { recipients: unknown[] }).recipients;
-    return Array.isArray(recipients) ? recipients.length : 1;
+    const recipients = (channel as unknown as { recipients: { size: number } }).recipients;
+    // +1 because the collection excludes the current (client) user
+    return (recipients?.size ?? 0) + 1;
   }
 
   // Regular DM – just the other person

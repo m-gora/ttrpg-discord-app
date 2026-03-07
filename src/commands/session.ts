@@ -2,6 +2,8 @@ import {
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
   EmbedBuilder,
+  InteractionContextType,
+  ApplicationIntegrationType,
   time,
 } from "discord.js";
 import { randomUUID } from "node:crypto";
@@ -11,20 +13,24 @@ import {
   removeSession,
 } from "../sessions";
 import { buildSessionCard, countChannelMembers } from "../session-card";
+import { getChannelCampaigns, nextSessionNumber } from "../campaigns";
 
 export const data = new SlashCommandBuilder()
   .setName("session")
   .setDescription("Manage TTRPG session events")
+  .setIntegrationTypes(
+    ApplicationIntegrationType.GuildInstall,
+    ApplicationIntegrationType.UserInstall,
+  )
+  .setContexts(
+    InteractionContextType.Guild,
+    InteractionContextType.BotDM,
+    InteractionContextType.PrivateChannel,
+  )
   .addSubcommand((sub) =>
     sub
       .setName("create")
       .setDescription("Schedule a new session")
-      .addStringOption((opt) =>
-        opt
-          .setName("title")
-          .setDescription('Session title, e.g. "Curse of Strahd – Session 12"')
-          .setRequired(true),
-      )
       .addStringOption((opt) =>
         opt
           .setName("date")
@@ -33,8 +39,20 @@ export const data = new SlashCommandBuilder()
       )
       .addStringOption((opt) =>
         opt
+          .setName("title")
+          .setDescription("Session title (auto-generated if using a campaign)")
+          .setRequired(false),
+      )
+      .addStringOption((opt) =>
+        opt
           .setName("timezone")
           .setDescription("IANA timezone, e.g. Europe/Rome (default: UTC)")
+          .setRequired(false),
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("campaign")
+          .setDescription("Campaign ID — auto-names the session (use /campaign list)")
           .setRequired(false),
       ),
   )
@@ -70,9 +88,10 @@ export async function execute(interaction: ChatInputCommandInteraction) {
 // ── Create ────────────────────────────────────────────────
 
 async function handleCreate(interaction: ChatInputCommandInteraction) {
-  const title = interaction.options.getString("title", true);
+  const titleOpt = interaction.options.getString("title");
   const dateStr = interaction.options.getString("date", true);
   const tz = interaction.options.getString("timezone") ?? "UTC";
+  const campaignIdOpt = interaction.options.getString("campaign");
 
   // Parse the user-supplied date in the given timezone
   const parsed = parseDateInTZ(dateStr, tz);
@@ -104,6 +123,36 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
     return;
   }
 
+  // If a campaign was specified, resolve it and auto-generate the title
+  let title = titleOpt ?? "";
+  let campaignId = "";
+  let vttLink = "";
+
+  if (campaignIdOpt) {
+    const campaigns = await getChannelCampaigns(interaction.channelId);
+    const campaign = campaigns.find((c) => c.id === campaignIdOpt);
+    if (!campaign) {
+      await interaction.reply({
+        content: "❌ Campaign not found in this channel. Use `/campaign list`.",
+        ephemeral: true,
+      });
+      return;
+    }
+    const sessionNum = await nextSessionNumber(campaign.id);
+    // Use custom title if provided, otherwise auto-generate from campaign
+    title = title || `${campaign.name} — Session ${sessionNum}`;
+    campaignId = campaign.id;
+    vttLink = campaign.vttLink;
+  }
+
+  if (!title) {
+    await interaction.reply({
+      content: "❌ Please provide a `title` or a `campaign` to auto-generate one.",
+      ephemeral: true,
+    });
+    return;
+  }
+
   const session = {
     id,
     guildId: interaction.guildId ?? "",
@@ -111,8 +160,11 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
     title,
     date: parsed.toISOString(),
     createdBy: interaction.user.id,
+    campaignId,
+    vttLink,
     messageId: "", // will be set after sending
     rsvps: [] as string[],
+    declined: [] as string[],
     rescheduleActive: false,
     rescheduleMessageId: "",
     reminded24h: false,

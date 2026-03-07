@@ -14,10 +14,16 @@ export interface Session {
   date: string;
   /** ID of the user who created the session */
   createdBy: string;
+  /** Optional campaign ID this session belongs to */
+  campaignId: string;
+  /** VTT link (copied from the campaign at creation time) */
+  vttLink: string;
   /** Discord message ID of the session card (for editing the embed) */
   messageId: string;
-  /** Array of user IDs who have RSVPd */
+  /** Array of user IDs who have RSVPd (attending) */
   rsvps: string[];
+  /** Array of user IDs who have explicitly declined */
+  declined: string[];
   /** Whether a reschedule poll is currently active */
   rescheduleActive: boolean;
   /** Discord message ID of the active reschedule poll */

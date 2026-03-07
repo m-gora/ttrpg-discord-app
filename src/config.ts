@@ -7,4 +7,6 @@ export const CONFIG = {
   GUILD_ID: process.env.DISCORD_GUILD_ID ?? "",
   /** Path to the JSON file used as a lightweight session store */
   SESSIONS_FILE: process.env.SESSIONS_FILE ?? "./sessions.json",
+  /** Path to the JSON file used as a lightweight campaign store */
+  CAMPAIGNS_FILE: process.env.CAMPAIGNS_FILE ?? "./campaigns.json",
 } as const;

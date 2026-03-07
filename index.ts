@@ -6,6 +6,7 @@ import {
 } from "discord.js";
 import { CONFIG } from "./src/config";
 import { execute as sessionExecute } from "./src/commands/session";
+import { execute as campaignExecute } from "./src/commands/campaign";
 import { startScheduler } from "./src/scheduler";
 import { handleRsvpButton } from "./src/rsvp-handler.ts";
 
@@ -47,6 +48,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.commandName === "session") {
       await sessionExecute(interaction);
+    } else if (interaction.commandName === "campaign") {
+      await campaignExecute(interaction);
     } else {
       await interaction.reply({ content: "Unknown command.", ephemeral: true });
     }

@@ -1,15 +1,17 @@
-FROM oven/bun:1 AS base
+FROM oven/bun:1 AS deps
 WORKDIR /app
-
-# Install dependencies
-FROM base AS deps
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile --production
 
-# Final image
-FROM base
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
+# ── Distroless runtime (~30 MB, no shell, no package manager) ──
+FROM oven/bun:1-distroless AS runtime
+WORKDIR /app
 
-USER bun
+# Copy only what's needed to run
+COPY --from=deps /app/node_modules ./node_modules
+COPY package.json ./
+COPY tsconfig.json ./
+COPY index.ts ./
+COPY src/ ./src/
+
 CMD ["bun", "run", "index.ts"]

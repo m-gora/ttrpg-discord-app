@@ -17,6 +17,7 @@ spec:
       labels:
         app.kubernetes.io/name: ttrpg-discord-app
     spec:
+      automountServiceAccountToken: false
       containers:
         - name: bot
           image: ghcr.io/m-gora/ttrpg-discord-app:0.0.0 # updated by CI on each release
@@ -27,6 +28,8 @@ spec:
           env:
             - name: SESSIONS_FILE
               value: /data/sessions.json
+            - name: CAMPAIGNS_FILE
+              value: /data/campaigns.json
           volumeMounts:
             - name: data
               mountPath: /data
@@ -34,13 +37,20 @@ spec:
             requests:
               cpu: 50m
               memory: 128Mi
+              ephemeral-storage: 64Mi
             limits:
               cpu: 200m
               memory: 256Mi
+              ephemeral-storage: 128Mi
           securityContext:
             runAsNonRoot: true
             readOnlyRootFilesystem: true
             allowPrivilegeEscalation: false
+            seccompProfile:
+              type: RuntimeDefault
+            capabilities:
+              drop:
+                - ALL
       volumes:
         - name: data
           persistentVolumeClaim:

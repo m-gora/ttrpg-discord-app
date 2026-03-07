@@ -13,7 +13,7 @@ import {
   removeSession,
 } from "../sessions";
 import { buildSessionCard, countChannelMembers } from "../session-card";
-import { getChannelCampaigns, nextSessionNumber } from "../campaigns";
+import { getChannelCampaigns, nextSessionNumber, decrementSessionCounter } from "../campaigns";
 
 export const data = new SlashCommandBuilder()
   .setName("session")
@@ -228,6 +228,11 @@ async function handleCancel(interaction: ChatInputCommandInteraction) {
       ephemeral: true,
     });
     return;
+  }
+
+  // If this session belongs to a campaign, give the session number back
+  if (session.campaignId) {
+    await decrementSessionCounter(session.campaignId);
   }
 
   await removeSession(id);

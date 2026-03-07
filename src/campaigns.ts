@@ -81,3 +81,15 @@ export async function nextSessionNumber(campaignId: string): Promise<number> {
   await save(campaigns);
   return campaign.sessionCounter;
 }
+
+/**
+ * Decrement the session counter for a campaign (e.g. when a session is cancelled).
+ * Ensures the counter never goes below 0.
+ */
+export async function decrementSessionCounter(campaignId: string): Promise<void> {
+  const campaigns = await load();
+  const campaign = campaigns.find((c) => c.id === campaignId);
+  if (!campaign) return;
+  campaign.sessionCounter = Math.max(0, campaign.sessionCounter - 1);
+  await save(campaigns);
+}

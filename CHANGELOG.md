@@ -1,3 +1,9 @@
+## [1.0.3](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.2...v1.0.3) (2026-03-08)
+
+### Bug Fixes
+
+* update undici to safe version and don't let argocd override secrets ([99a8891](https://github.com/m-gora/ttrpg-discord-app/commit/99a88915b9da4321824b642ac1d349bdd09f66f8))
+
 ## [1.0.2](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.1...v1.0.2) (2026-03-08)
 
 ### Bug Fixes

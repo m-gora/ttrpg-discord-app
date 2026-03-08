@@ -4,6 +4,7 @@ import {
   EmbedBuilder,
   InteractionContextType,
   ApplicationIntegrationType,
+  MessageFlags,
   time,
 } from "discord.js";
 import { randomUUID } from "node:crypto";
@@ -99,7 +100,7 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
     await interaction.reply({
       content:
         "❌ Invalid date. Please use the format `YYYY-MM-DD HH:mm` and a valid IANA timezone.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -107,7 +108,7 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
   if (parsed.getTime() < Date.now()) {
     await interaction.reply({
       content: "❌ That date is in the past!",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -118,7 +119,7 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
   if (!channel) {
     await interaction.reply({
       content: "\u274c Could not resolve the channel.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -134,7 +135,7 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
     if (!campaign) {
       await interaction.reply({
         content: "❌ Campaign not found in this channel. Use `/campaign list`.",
-        ephemeral: true,
+        flags: MessageFlags.Ephemeral,
       });
       return;
     }
@@ -148,7 +149,7 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
   if (!title) {
     await interaction.reply({
       content: "❌ Please provide a `title` or a `campaign` to auto-generate one.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -194,7 +195,7 @@ async function handleList(interaction: ChatInputCommandInteraction) {
   if (sessions.length === 0) {
     await interaction.reply({
       content: "📭 No upcoming sessions. Use `/session create` to schedule one!",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -225,7 +226,7 @@ async function handleCancel(interaction: ChatInputCommandInteraction) {
   if (!session) {
     await interaction.reply({
       content: "❌ Session not found. Use `/session list` to see upcoming sessions.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }

@@ -2,6 +2,7 @@ import {
   Client,
   GatewayIntentBits,
   Events,
+  MessageFlags,
   Partials,
 } from "discord.js";
 import { CONFIG } from "./src/config";
@@ -51,13 +52,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
     } else if (interaction.commandName === "campaign") {
       await campaignExecute(interaction);
     } else {
-      await interaction.reply({ content: "Unknown command.", ephemeral: true });
+      await interaction.reply({ content: "Unknown command.", flags: MessageFlags.Ephemeral });
     }
   } catch (err) {
     console.error(`[command] Error handling /${interaction.commandName}:`, err);
     const reply = {
       content: "⚠️ Something went wrong running that command.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     };
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(reply);

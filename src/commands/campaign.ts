@@ -4,6 +4,7 @@ import {
   EmbedBuilder,
   InteractionContextType,
   ApplicationIntegrationType,
+  MessageFlags,
 } from "discord.js";
 import { randomUUID } from "node:crypto";
 import {
@@ -139,7 +140,7 @@ async function handleEdit(interaction: ChatInputCommandInteraction) {
   if (!campaign) {
     await interaction.reply({
       content: "❌ Campaign not found in this channel. Use `/campaign list`.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -171,7 +172,7 @@ async function handleList(interaction: ChatInputCommandInteraction) {
   if (campaigns.length === 0) {
     await interaction.reply({
       content: "📭 No campaigns in this channel. Use `/campaign create` to add one!",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -201,7 +202,7 @@ async function handleDelete(interaction: ChatInputCommandInteraction) {
   if (!campaign) {
     await interaction.reply({
       content: "❌ Campaign not found in this channel.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }

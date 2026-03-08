@@ -1,4 +1,4 @@
-import { type ButtonInteraction, type SendableChannels } from "discord.js";
+import { type ButtonInteraction, MessageFlags } from "discord.js";
 import { type Session, getSessions, updateSession } from "./sessions";
 import {
   ATTEND_BUTTON_PREFIX,
@@ -31,7 +31,7 @@ export async function handleRsvpButton(
   if (!session) {
     await interaction.reply({
       content: "❌ This session no longer exists.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -44,13 +44,13 @@ export async function handleRsvpButton(
   if (isAttend) {
     const earlyReply = handleAttend(session, userId);
     if (earlyReply) {
-      await interaction.reply({ content: earlyReply, ephemeral: true });
+      await interaction.reply({ content: earlyReply, flags: MessageFlags.Ephemeral });
       return;
     }
   } else {
     const earlyReply = await handleDecline(session, userId, interaction);
     if (earlyReply) {
-      await interaction.reply({ content: earlyReply, ephemeral: true });
+      await interaction.reply({ content: earlyReply, flags: MessageFlags.Ephemeral });
       return;
     }
   }
@@ -62,7 +62,7 @@ export async function handleRsvpButton(
   if (!channel) {
     await interaction.reply({
       content: isAttend ? "✅ You're attending!" : "❌ Marked as can't make it.",
-      ephemeral: true,
+      flags: MessageFlags.Ephemeral,
     });
     return;
   }
@@ -99,12 +99,15 @@ async function handleDecline(
   await updateSession(session);
 
   // Trigger reschedule poll on the first cancellation
-  if (!session.rescheduleActive && interaction.channel) {
-    await openReschedulePoll(
-      interaction.channel as SendableChannels,
-      session,
-      interaction.user.displayName,
-    );
+  if (!session.rescheduleActive && interaction.channelId) {
+    const channel = await interaction.client.channels.fetch(interaction.channelId);
+    if (channel?.isSendable()) {
+      await openReschedulePoll(
+        channel,
+        session,
+        interaction.user.displayName,
+      );
+    }
   }
 
   return null;

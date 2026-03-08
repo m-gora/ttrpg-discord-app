@@ -1,3 +1,9 @@
+## [1.0.4](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.3...v1.0.4) (2026-03-08)
+
+### Bug Fixes
+
+* need to find a way so argocd doesnt override the secret with dummies all the time ([a285d0d](https://github.com/m-gora/ttrpg-discord-app/commit/a285d0d070201095b493568c484bae202f6a3c3c))
+
 ## [1.0.3](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.2...v1.0.3) (2026-03-08)
 
 ### Bug Fixes

@@ -1,3 +1,9 @@
+## [1.0.2](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.1...v1.0.2) (2026-03-08)
+
+### Bug Fixes
+
+* dont use bun run in the entrypoint on distroless ([197c8ab](https://github.com/m-gora/ttrpg-discord-app/commit/197c8ab0232966ed63eedb5c4c35eebd9ace09c9))
+
 ## [1.0.1](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.0...v1.0.1) (2026-03-08)
 
 ### Bug Fixes

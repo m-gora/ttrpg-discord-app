@@ -98,26 +98,3 @@ jobs:
         with:
           sarif_file: trivy-results.sarif
           category: trivy
-
-  update-manifests:
-    name: Update K8s Image Tag
-    runs-on: ubuntu-latest
-    needs: [release, docker]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Update deployment image tag
-        run: |
-          VERSION="${{ needs.release.outputs.new_release_version }}"
-          sed -i "s|image: ghcr.io/m-gora/ttrpg-discord-app:.*|image: ghcr.io/m-gora/ttrpg-discord-app:${VERSION}|" k8s/deployment.yaml
-
-      - name: Commit and push
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add k8s/deployment.yaml
-          git commit -m "chore(k8s): update image to v${{ needs.release.outputs.new_release_version }} [skip ci]"
-          git push

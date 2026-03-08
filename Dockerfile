@@ -17,4 +17,4 @@ COPY src/ ./src/
 # Run as non-root (distroless has no adduser; set UID directly)
 USER 65534
 
-CMD ["bun", "run", "index.ts"]
+CMD ["index.ts"]

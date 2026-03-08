@@ -1,3 +1,9 @@
+## [1.1.1](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.0...v1.1.1) (2026-03-08)
+
+### Bug Fixes
+
+* increate NATS memory ([d900a7f](https://github.com/m-gora/ttrpg-discord-app/commit/d900a7f44773c46f156f646f29214ae8ff1a34fc))
+
 ## [1.1.0](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.6...v1.1.0) (2026-03-08)
 
 ### Features

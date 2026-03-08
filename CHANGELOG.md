@@ -1,3 +1,9 @@
+## [1.1.0](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.6...v1.1.0) (2026-03-08)
+
+### Features
+
+* implement messaging via NATS for durability ([6273242](https://github.com/m-gora/ttrpg-discord-app/commit/6273242118d5cb63f9b1f5ad496dbb5c1ed3cdd0))
+
 ## [1.0.6](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.5...v1.0.6) (2026-03-08)
 
 ### Bug Fixes

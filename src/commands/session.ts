@@ -15,6 +15,9 @@ import {
 } from "../sessions";
 import { buildSessionCard, countChannelMembers } from "../session-card";
 import { getChannelCampaigns, nextSessionNumber, decrementSessionCounter } from "../campaigns";
+import type { MessagingPort } from "../messaging/port";
+import { Subjects } from "../messaging/events";
+import type { SessionCreatedEvent, SessionCancelledEvent } from "../messaging/events";
 
 export const data = new SlashCommandBuilder()
   .setName("session")
@@ -74,21 +77,27 @@ export const data = new SlashCommandBuilder()
       ),
   );
 
-export async function execute(interaction: ChatInputCommandInteraction) {
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+  messaging?: MessagingPort,
+) {
   const sub = interaction.options.getSubcommand();
 
   if (sub === "create") {
-    await handleCreate(interaction);
+    await handleCreate(interaction, messaging);
   } else if (sub === "list") {
     await handleList(interaction);
   } else if (sub === "cancel") {
-    await handleCancel(interaction);
+    await handleCancel(interaction, messaging);
   }
 }
 
 // ── Create ────────────────────────────────────────────────
 
-async function handleCreate(interaction: ChatInputCommandInteraction) {
+async function handleCreate(
+  interaction: ChatInputCommandInteraction,
+  messaging?: MessagingPort,
+) {
   const titleOpt = interaction.options.getString("title");
   const dateStr = interaction.options.getString("date", true);
   const tz = interaction.options.getString("timezone") ?? "UTC";
@@ -185,6 +194,8 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
   // Store the message ID so we can edit the card later on RSVP
   session.messageId = reply.id;
   await addSession(session);
+
+  await messaging?.publish<SessionCreatedEvent>(Subjects.SESSION_CREATED, { session });
 }
 
 // ── List ──────────────────────────────────────────────────
@@ -218,7 +229,10 @@ async function handleList(interaction: ChatInputCommandInteraction) {
 
 // ── Cancel ────────────────────────────────────────────────
 
-async function handleCancel(interaction: ChatInputCommandInteraction) {
+async function handleCancel(
+  interaction: ChatInputCommandInteraction,
+  messaging?: MessagingPort,
+) {
   const id = interaction.options.getString("id", true);
   const sessions = await getUpcomingSessions(interaction.guildId ?? "");
   const session = sessions.find((s) => s.id === id);
@@ -238,6 +252,13 @@ async function handleCancel(interaction: ChatInputCommandInteraction) {
 
   await removeSession(id);
   await interaction.reply(`🗑️ Session **${session.title}** has been cancelled.`);
+
+  await messaging?.publish<SessionCancelledEvent>(Subjects.SESSION_CANCELLED, {
+    sessionId: id,
+    cancelledBy: interaction.user.id,
+    title: session.title,
+    campaignId: session.campaignId,
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────

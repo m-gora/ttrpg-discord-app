@@ -8,6 +8,13 @@ import {
 import type { Session } from "./sessions";
 import { getSessions, updateSession } from "./sessions";
 import { buildSessionCard, countChannelMembers } from "./session-card";
+import type { MessagingPort } from "./messaging/port";
+import { Subjects } from "./messaging/events";
+import type {
+  ReschedulePollOpenedEvent,
+  ReschedulePollResolvedEvent,
+  SessionRescheduledEvent,
+} from "./messaging/events";
 
 const DAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 const MONTH_NAMES = [
@@ -51,6 +58,7 @@ export async function openReschedulePoll(
   channel: SendableChannels,
   session: Session,
   declinedByUsername: string,
+  messaging?: MessagingPort,
 ): Promise<void> {
   // Don't open another poll if one is already active
   if (session.rescheduleActive) return;
@@ -72,20 +80,30 @@ export async function openReschedulePoll(
   session.rescheduleActive = true;
   session.rescheduleMessageId = pollMessage.id;
   await updateSession(session);
+
+  await messaging?.publish<ReschedulePollOpenedEvent>(Subjects.RESCHEDULE_POLL_OPENED, {
+    sessionId: session.id,
+    title: session.title,
+    pollMessageId: pollMessage.id,
+    declinedByUsername,
+  });
 }
 
 /**
  * Called by the scheduler — checks if any reschedule poll has ended,
  * tallies the votes, picks the winning date, and updates the session.
  */
-export async function checkReschedulePolls(client: Client): Promise<void> {
+export async function checkReschedulePolls(
+  client: Client,
+  messaging?: MessagingPort,
+): Promise<void> {
   const sessions = await getSessions();
 
   for (const session of sessions) {
     if (!session.rescheduleActive || !session.rescheduleMessageId) continue;
 
     try {
-      await processReschedulePoll(client, session);
+      await processReschedulePoll(client, session, messaging);
     } catch (err) {
       console.error(
         `[reschedule] Error processing poll for session ${session.id}:`,
@@ -98,6 +116,7 @@ export async function checkReschedulePolls(client: Client): Promise<void> {
 async function processReschedulePoll(
   client: Client,
   session: Session,
+  messaging?: MessagingPort,
 ): Promise<void> {
   const channel = await client.channels.fetch(session.channelId);
   if (!channel?.isTextBased() || !channel.isSendable()) return;
@@ -154,4 +173,19 @@ async function processReschedulePoll(
 
   session.messageId = newCard.id;
   await updateSession(session);
+
+  await messaging?.publish<ReschedulePollResolvedEvent>(Subjects.RESCHEDULE_POLL_RESOLVED, {
+    sessionId: session.id,
+    title: session.title,
+    winningDate: winningDate.date.toISOString(),
+    votes: bestVotes,
+  });
+
+  await messaging?.publish<SessionRescheduledEvent>(Subjects.SESSION_RESCHEDULED, {
+    sessionId: session.id,
+    previousDate: new Date(session.date).toISOString(),
+    newDate: winningDate.date.toISOString(),
+    title: session.title,
+    votes: bestVotes,
+  });
 }

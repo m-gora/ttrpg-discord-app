@@ -14,6 +14,13 @@ import {
   removeCampaign,
   type Campaign,
 } from "../campaigns";
+import type { MessagingPort } from "../messaging/port";
+import { Subjects } from "../messaging/events";
+import type {
+  CampaignCreatedEvent,
+  CampaignUpdatedEvent,
+  CampaignDeletedEvent,
+} from "../messaging/events";
 
 export const data = new SlashCommandBuilder()
   .setName("campaign")
@@ -84,23 +91,29 @@ export const data = new SlashCommandBuilder()
       ),
   );
 
-export async function execute(interaction: ChatInputCommandInteraction) {
+export async function execute(
+  interaction: ChatInputCommandInteraction,
+  messaging?: MessagingPort,
+) {
   const sub = interaction.options.getSubcommand();
 
   if (sub === "create") {
-    await handleCreate(interaction);
+    await handleCreate(interaction, messaging);
   } else if (sub === "edit") {
-    await handleEdit(interaction);
+    await handleEdit(interaction, messaging);
   } else if (sub === "list") {
     await handleList(interaction);
   } else if (sub === "delete") {
-    await handleDelete(interaction);
+    await handleDelete(interaction, messaging);
   }
 }
 
 // ── Create ────────────────────────────────────────────────
 
-async function handleCreate(interaction: ChatInputCommandInteraction) {
+async function handleCreate(
+  interaction: ChatInputCommandInteraction,
+  messaging?: MessagingPort,
+) {
   const name = interaction.options.getString("name", true);
   const vtt = interaction.options.getString("vtt") ?? "";
 
@@ -115,6 +128,8 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
   };
 
   await addCampaign(campaign);
+
+  await messaging?.publish<CampaignCreatedEvent>(Subjects.CAMPAIGN_CREATED, { campaign });
 
   const embed = new EmbedBuilder()
     .setTitle("📖 Campaign Created")
@@ -132,7 +147,10 @@ async function handleCreate(interaction: ChatInputCommandInteraction) {
 
 // ── Edit ──────────────────────────────────────────────────
 
-async function handleEdit(interaction: ChatInputCommandInteraction) {
+async function handleEdit(
+  interaction: ChatInputCommandInteraction,
+  messaging?: MessagingPort,
+) {
   const id = interaction.options.getString("id", true);
   const campaigns = await getChannelCampaigns(interaction.channelId);
   const campaign = campaigns.find((c) => c.id === id);
@@ -151,7 +169,16 @@ async function handleEdit(interaction: ChatInputCommandInteraction) {
   if (newName) campaign.name = newName;
   if (newVtt !== null && newVtt !== undefined) campaign.vttLink = newVtt;
 
+  const updatedFields: string[] = [];
+  if (newName) updatedFields.push("name");
+  if (newVtt !== null && newVtt !== undefined) updatedFields.push("vttLink");
+
   await updateCampaign(campaign);
+
+  await messaging?.publish<CampaignUpdatedEvent>(Subjects.CAMPAIGN_UPDATED, {
+    campaign,
+    updatedFields,
+  });
 
   const embed = new EmbedBuilder()
     .setTitle("✏️ Campaign Updated")
@@ -194,7 +221,10 @@ async function handleList(interaction: ChatInputCommandInteraction) {
 
 // ── Delete ────────────────────────────────────────────────
 
-async function handleDelete(interaction: ChatInputCommandInteraction) {
+async function handleDelete(
+  interaction: ChatInputCommandInteraction,
+  messaging?: MessagingPort,
+) {
   const id = interaction.options.getString("id", true);
   const campaigns = await getChannelCampaigns(interaction.channelId);
   const campaign = campaigns.find((c) => c.id === id);
@@ -208,5 +238,12 @@ async function handleDelete(interaction: ChatInputCommandInteraction) {
   }
 
   await removeCampaign(id);
+
+  await messaging?.publish<CampaignDeletedEvent>(Subjects.CAMPAIGN_DELETED, {
+    campaignId: id,
+    name: campaign.name,
+    deletedBy: interaction.user.id,
+  });
+
   await interaction.reply(`🗑️ Campaign **${campaign.name}** has been deleted.`);
 }

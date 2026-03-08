@@ -9,4 +9,6 @@ export const CONFIG = {
   SESSIONS_FILE: process.env.SESSIONS_FILE ?? "./sessions.json",
   /** Path to the JSON file used as a lightweight campaign store */
   CAMPAIGNS_FILE: process.env.CAMPAIGNS_FILE ?? "./campaigns.json",
+  /** NATS server URL (set to empty string to disable event publishing) */
+  NATS_URL: process.env.NATS_URL ?? "",
 } as const;

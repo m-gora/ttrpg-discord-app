@@ -3,6 +3,13 @@ import { Client, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, tim
 import type { SendableChannels } from "discord.js";
 import { getSessions, updateSession, removeSession, type Session } from "./sessions";
 import { checkReschedulePolls } from "./reschedule-poll";
+import type { MessagingPort } from "./messaging/port";
+import { Subjects } from "./messaging/events";
+import type {
+  Reminder24hSentEvent,
+  ReminderStartSentEvent,
+  SessionCleanedUpEvent,
+} from "./messaging/events";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
 const FIVE_MIN_MS = 5 * 60 * 1000;
@@ -10,12 +17,12 @@ const FIVE_MIN_MS = 5 * 60 * 1000;
 /**
  * Start a cron job that checks every minute for sessions that need reminders.
  */
-export function startScheduler(client: Client) {
+export function startScheduler(client: Client, messaging?: MessagingPort) {
   // Runs every minute
   cron.schedule("* * * * *", async () => {
     try {
-      await checkReminders(client);
-      await checkReschedulePolls(client);
+      await checkReminders(client, messaging);
+      await checkReschedulePolls(client, messaging);
     } catch (err) {
       console.error("[scheduler] Error checking reminders:", err);
     }
@@ -24,7 +31,7 @@ export function startScheduler(client: Client) {
   console.log("[scheduler] Reminder scheduler started (checking every minute)");
 }
 
-async function checkReminders(client: Client) {
+async function checkReminders(client: Client, messaging?: MessagingPort) {
   const sessions = await getSessions();
   const now = Date.now();
 
@@ -33,16 +40,20 @@ async function checkReminders(client: Client) {
     const timeUntil = sessionTime - now;
 
     if (shouldSend24hReminder(session, timeUntil)) {
-      await send24hReminder(client, session);
+      await send24hReminder(client, session, messaging);
     }
 
     if (shouldSendStartReminder(session, timeUntil)) {
-      await sendStartReminder(client, session);
+      await sendStartReminder(client, session, messaging);
     }
 
     // Cleanup old sessions (1 hour after start)
     if (timeUntil < -60 * 60 * 1000) {
       await removeSession(session.id);
+      await messaging?.publish<SessionCleanedUpEvent>(Subjects.SESSION_CLEANED_UP, {
+        sessionId: session.id,
+        title: session.title,
+      });
     }
   }
 }
@@ -55,7 +66,7 @@ function shouldSendStartReminder(session: { remindedStart: boolean }, timeUntil:
   return !session.remindedStart && timeUntil <= 0 && timeUntil > -FIVE_MIN_MS;
 }
 
-async function send24hReminder(client: Client, session: Session) {
+async function send24hReminder(client: Client, session: Session, messaging?: MessagingPort) {
   const channel = await resolveTextChannel(client, session.channelId);
   if (channel) {
     const d = new Date(session.date);
@@ -70,9 +81,15 @@ async function send24hReminder(client: Client, session: Session) {
   }
   session.reminded24h = true;
   await updateSession(session);
+
+  await messaging?.publish<Reminder24hSentEvent>(Subjects.REMINDER_24H_SENT, {
+    sessionId: session.id,
+    title: session.title,
+    channelId: session.channelId,
+  });
 }
 
-async function sendStartReminder(client: Client, session: Session) {
+async function sendStartReminder(client: Client, session: Session, messaging?: MessagingPort) {
   const channel = await resolveTextChannel(client, session.channelId);
   if (channel) {
     const mentions = session.rsvps.length > 0
@@ -105,6 +122,12 @@ async function sendStartReminder(client: Client, session: Session) {
   }
   session.remindedStart = true;
   await updateSession(session);
+
+  await messaging?.publish<ReminderStartSentEvent>(Subjects.REMINDER_START_SENT, {
+    sessionId: session.id,
+    title: session.title,
+    channelId: session.channelId,
+  });
 }
 
 async function resolveTextChannel(

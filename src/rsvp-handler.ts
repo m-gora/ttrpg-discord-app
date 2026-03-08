@@ -7,6 +7,9 @@ import {
   countChannelMembers,
 } from "./session-card";
 import { openReschedulePoll } from "./reschedule-poll";
+import type { MessagingPort } from "./messaging/port";
+import { Subjects } from "./messaging/events";
+import type { RsvpAttendedEvent, RsvpDeclinedEvent } from "./messaging/events";
 
 /**
  * Handle Attend / Don't Attend button clicks.
@@ -16,6 +19,7 @@ import { openReschedulePoll } from "./reschedule-poll";
  */
 export async function handleRsvpButton(
   interaction: ButtonInteraction,
+  messaging?: MessagingPort,
 ): Promise<void> {
   const customId = interaction.customId;
 
@@ -47,12 +51,22 @@ export async function handleRsvpButton(
       await interaction.reply({ content: earlyReply, flags: MessageFlags.Ephemeral });
       return;
     }
+    await messaging?.publish<RsvpAttendedEvent>(Subjects.RSVP_ATTENDED, {
+      sessionId: session.id,
+      userId,
+      totalAttending: session.rsvps.length,
+    });
   } else {
-    const earlyReply = await handleDecline(session, userId, interaction);
+    const earlyReply = await handleDecline(session, userId, interaction, messaging);
     if (earlyReply) {
       await interaction.reply({ content: earlyReply, flags: MessageFlags.Ephemeral });
       return;
     }
+    await messaging?.publish<RsvpDeclinedEvent>(Subjects.RSVP_DECLINED, {
+      sessionId: session.id,
+      userId,
+      totalDeclined: session.declined.length,
+    });
   }
 
   await updateSession(session);
@@ -87,6 +101,7 @@ async function handleDecline(
   session: Session,
   userId: string,
   interaction: ButtonInteraction,
+  messaging?: MessagingPort,
 ): Promise<string | null> {
   if (session.declined.includes(userId)) {
     return "You've already indicated you can't make it.";
@@ -106,6 +121,7 @@ async function handleDecline(
         channel,
         session,
         interaction.user.displayName,
+        messaging,
       );
     }
   }

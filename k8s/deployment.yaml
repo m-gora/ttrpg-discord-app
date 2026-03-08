@@ -30,6 +30,8 @@ spec:
               value: /data/sessions.json
             - name: CAMPAIGNS_FILE
               value: /data/campaigns.json
+            - name: NATS_URL
+              value: nats://nats.ttrpg.svc:4222
           volumeMounts:
             - name: data
               mountPath: /data

@@ -10,10 +10,27 @@ import { execute as sessionExecute } from "./src/commands/session";
 import { execute as campaignExecute } from "./src/commands/campaign";
 import { startScheduler } from "./src/scheduler";
 import { handleRsvpButton } from "./src/rsvp-handler.ts";
+import { NatsAdapter } from "./src/messaging/nats-adapter";
+import type { MessagingPort } from "./src/messaging/port";
 
 if (!CONFIG.TOKEN) {
   console.error("❌ DISCORD_TOKEN is not set. Create a .env file (see .env.example).");
   process.exit(1);
+}
+
+// ── Messaging (optional — runs fine without NATS) ─────────
+
+let messaging: MessagingPort | undefined;
+
+if (CONFIG.NATS_URL) {
+  const adapter = new NatsAdapter({ url: CONFIG.NATS_URL });
+  try {
+    await adapter.connect();
+    messaging = adapter;
+    console.log("[messaging] NATS adapter ready");
+  } catch (err) {
+    console.error("[messaging] Failed to connect to NATS — events will not be published:", err);
+  }
 }
 
 const client = new Client({
@@ -30,14 +47,14 @@ const client = new Client({
 
 client.once(Events.ClientReady, (c) => {
   console.log(`✅ Logged in as ${c.user.tag}`);
-  startScheduler(client);
+  startScheduler(client, messaging);
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
   // Handle RSVP button clicks
   if (interaction.isButton()) {
     try {
-      await handleRsvpButton(interaction);
+      await handleRsvpButton(interaction, messaging);
     } catch (err) {
       console.error("[button] Error handling RSVP:", err);
     }
@@ -48,9 +65,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 
   try {
     if (interaction.commandName === "session") {
-      await sessionExecute(interaction);
+      await sessionExecute(interaction, messaging);
     } else if (interaction.commandName === "campaign") {
-      await campaignExecute(interaction);
+      await campaignExecute(interaction, messaging);
     } else {
       await interaction.reply({ content: "Unknown command.", flags: MessageFlags.Ephemeral });
     }

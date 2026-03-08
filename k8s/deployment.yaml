@@ -20,7 +20,7 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: bot
-          image: ghcr.io/m-gora/ttrpg-discord-app:0.0.0 # updated by CI on each release
+          image: ghcr.io/m-gora/ttrpg-discord-app:1.0.0 # updated by CI on each release
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:

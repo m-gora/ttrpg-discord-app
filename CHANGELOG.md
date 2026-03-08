@@ -1,3 +1,9 @@
+## [1.0.1](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.0...v1.0.1) (2026-03-08)
+
+### Bug Fixes
+
+* run as non-root user ([f723156](https://github.com/m-gora/ttrpg-discord-app/commit/f723156cb3a3c598422f8a7b3a97d623094d58fc))
+
 ## 1.0.0 (2026-03-07)
 
 ### Features

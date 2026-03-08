@@ -153,7 +153,7 @@ export class NatsAdapter implements MessagingPort {
         name: STREAM_NAME,
         subjects: STREAM_SUBJECTS,
         retention: "limits" as any,
-        max_bytes: 256 * 1024 * 1024, // 256 MB
+        max_bytes: 256 * 1024 * 1024, // 256 MB — must be less than JetStream max_file
         max_age: 30 * 24 * 60 * 60 * 1_000_000_000, // 30 days in nanos
         storage: "file" as any,
         num_replicas: 1,

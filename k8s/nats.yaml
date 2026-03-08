@@ -15,7 +15,7 @@ data:
     jetstream {
       store_dir: /data/jetstream
       max_mem: 64M
-      max_file: 256M
+      max_file: 384M
     }
 
     lame_duck_duration: 30s

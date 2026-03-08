@@ -1,3 +1,9 @@
+## [1.0.5](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.4...v1.0.5) (2026-03-08)
+
+### Bug Fixes
+
+* ephemeral channel responses ([655bff3](https://github.com/m-gora/ttrpg-discord-app/commit/655bff3beb22a0f0858ea1076757957d81f81c86))
+
 ## [1.0.4](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.3...v1.0.4) (2026-03-08)
 
 ### Bug Fixes

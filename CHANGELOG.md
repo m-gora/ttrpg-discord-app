@@ -1,3 +1,9 @@
+## [1.0.6](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.5...v1.0.6) (2026-03-08)
+
+### Bug Fixes
+
+* ensure typing ([4c6e0ec](https://github.com/m-gora/ttrpg-discord-app/commit/4c6e0ec0b0e56e4fe422a5048f49aca3d6787e95))
+
 ## [1.0.5](https://github.com/m-gora/ttrpg-discord-app/compare/v1.0.4...v1.0.5) (2026-03-08)
 
 ### Bug Fixes

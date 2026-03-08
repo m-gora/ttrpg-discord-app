@@ -59,7 +59,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
     const reply = {
       content: "⚠️ Something went wrong running that command.",
       flags: MessageFlags.Ephemeral,
-    };
+    } as const;
     if (interaction.replied || interaction.deferred) {
       await interaction.followUp(reply);
     } else {

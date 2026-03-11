@@ -1,3 +1,9 @@
+## [1.1.2](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.1...v1.1.2) (2026-03-11)
+
+### Refactors
+
+* now using event sourcing ([c8500dc](https://github.com/m-gora/ttrpg-discord-app/commit/c8500dc235ca79bc2d9facfa47b020a377363671))
+
 ## [1.1.1](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.0...v1.1.1) (2026-03-08)
 
 ### Bug Fixes

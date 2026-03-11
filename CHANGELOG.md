@@ -1,3 +1,9 @@
+## [1.1.7](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.6...v1.1.7) (2026-03-11)
+
+### Bug Fixes
+
+* sending to dm channels ([56a5ec9](https://github.com/m-gora/ttrpg-discord-app/commit/56a5ec9d137fbb30ec8bac71a4c4e09fade39a2b))
+
 ## [1.1.6](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.5...v1.1.6) (2026-03-11)
 
 ### Bug Fixes

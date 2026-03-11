@@ -1,3 +1,9 @@
+## [1.1.8](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.7...v1.1.8) (2026-03-11)
+
+### Refactors
+
+* remove DM support ([08025ea](https://github.com/m-gora/ttrpg-discord-app/commit/08025eabf87b23363e2dc311c34005a5ca399a59))
+
 ## [1.1.7](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.6...v1.1.7) (2026-03-11)
 
 ### Bug Fixes

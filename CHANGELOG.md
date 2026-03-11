@@ -1,3 +1,9 @@
+## [1.1.3](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.2...v1.1.3) (2026-03-11)
+
+### Bug Fixes
+
+* timezone ([af31528](https://github.com/m-gora/ttrpg-discord-app/commit/af31528a9dadf36df7ea2eee0c9f711285cfb45f))
+
 ## [1.1.2](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.1...v1.1.2) (2026-03-11)
 
 ### Refactors

@@ -3,7 +3,6 @@ import {
   GatewayIntentBits,
   Events,
   MessageFlags,
-  Partials,
 } from "discord.js";
 import { CONFIG } from "./src/config";
 import { execute as sessionExecute } from "./src/commands/session";
@@ -45,11 +44,6 @@ const client = new Client({
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.DirectMessages,
-    GatewayIntentBits.DirectMessageReactions,
-  ],
-  partials: [
-    Partials.Channel, // required to receive DM/group DM events
   ],
 });
 

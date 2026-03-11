@@ -2,8 +2,6 @@ import {
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
   EmbedBuilder,
-  InteractionContextType,
-  ApplicationIntegrationType,
   MessageFlags,
 } from "discord.js";
 import { randomUUID } from "node:crypto";
@@ -23,15 +21,6 @@ import type {
 export const data = new SlashCommandBuilder()
   .setName("campaign")
   .setDescription("Manage TTRPG campaigns for this channel")
-  .setIntegrationTypes(
-    ApplicationIntegrationType.GuildInstall,
-    ApplicationIntegrationType.UserInstall,
-  )
-  .setContexts(
-    InteractionContextType.Guild,
-    InteractionContextType.BotDM,
-    InteractionContextType.PrivateChannel,
-  )
   .addSubcommand((sub) =>
     sub
       .setName("create")
@@ -42,12 +31,6 @@ export const data = new SlashCommandBuilder()
           .setDescription('Campaign name, e.g. "Curse of Strahd"')
           .setRequired(true),
       )
-      .addStringOption((opt) =>
-        opt
-          .setName("vtt")
-          .setDescription("Link to the VTT (Foundry, Roll20, etc.)")
-          .setRequired(false),
-      )
       .addIntegerOption((opt) =>
         opt
           .setName("players")
@@ -55,6 +38,12 @@ export const data = new SlashCommandBuilder()
           .setRequired(true)
           .setMinValue(1)
           .setMaxValue(20),
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("vtt")
+          .setDescription("Link to the VTT (Foundry, Roll20, etc.)")
+          .setRequired(false),
       )
       .addStringOption((opt) =>
         opt
@@ -156,7 +145,7 @@ async function handleCreate(
   const campaign: Campaign = {
     id: randomUUID().slice(0, 8),
     channelId: interaction.channelId,
-    guildId: interaction.guildId ?? "",
+    guildId: interaction.guildId!,
     name,
     vttLink: vtt,
     playerCount,
@@ -247,7 +236,8 @@ async function handleList(interaction: ChatInputCommandInteraction) {
         .map((c) => {
           const vtt = c.vttLink ? `🔗 [VTT](${c.vttLink})` : "*(no VTT link)*";
           const tz = c.timezone ? `🕐 ${c.timezone}` : "🕐 UTC";
-          return `**${c.name}** — ${c.sessionCounter} session(s) · ${c.playerCount} players\n${vtt} | ${tz} | ID: \`${c.id}\``;
+          const players = c.playerCount ? `${c.playerCount} players` : "*(no player count)*";
+          return `**${c.name}** — ${c.sessionCounter} session(s) · ${players}\n${vtt} | ${tz} | ID: \`${c.id}\``;
         })
         .join("\n\n"),
     );

@@ -2,8 +2,6 @@ import {
   SlashCommandBuilder,
   type ChatInputCommandInteraction,
   EmbedBuilder,
-  InteractionContextType,
-  ApplicationIntegrationType,
   MessageFlags,
   time,
 } from "discord.js";
@@ -20,15 +18,6 @@ import type { SessionCreateRequestedEvent, SessionCancelRequestedEvent } from ".
 export const data = new SlashCommandBuilder()
   .setName("session")
   .setDescription("Manage TTRPG session events")
-  .setIntegrationTypes(
-    ApplicationIntegrationType.GuildInstall,
-    ApplicationIntegrationType.UserInstall,
-  )
-  .setContexts(
-    InteractionContextType.Guild,
-    InteractionContextType.BotDM,
-    InteractionContextType.PrivateChannel,
-  )
   .addSubcommand((sub) =>
     sub
       .setName("create")
@@ -178,7 +167,7 @@ async function handleCreate(
 
   const session = {
     id,
-    guildId: interaction.guildId ?? "",
+    guildId: interaction.guildId!,
     channelId: interaction.channelId,
     title,
     date: parsed.toISOString(),
@@ -212,7 +201,7 @@ async function handleCreate(
 // ── List ──────────────────────────────────────────────────
 
 async function handleList(interaction: ChatInputCommandInteraction) {
-  const sessions = await getUpcomingSessions(interaction.guildId ?? "");
+  const sessions = await getUpcomingSessions(interaction.guildId!);
 
   if (sessions.length === 0) {
     await interaction.reply({
@@ -253,7 +242,7 @@ async function handleCancel(
   }
 
   const id = interaction.options.getString("id", true);
-  const sessions = await getUpcomingSessions(interaction.guildId ?? "");
+  const sessions = await getUpcomingSessions(interaction.guildId!);
   const session = sessions.find((s) => s.id === id);
 
   if (!session) {
@@ -270,7 +259,7 @@ async function handleCancel(
     Subjects.SESSION_CANCEL_REQUESTED,
     {
       sessionId: id,
-      guildId: interaction.guildId ?? "",
+      guildId: interaction.guildId!,
       cancelledBy: interaction.user.id,
       interactionToken: interaction.token,
       applicationId: interaction.applicationId,

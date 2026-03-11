@@ -74,7 +74,7 @@ function shouldSendStartReminder(session: { remindedStart: boolean }, timeUntil:
 }
 
 async function send24hReminder(client: Client, session: Session, messaging?: MessagingPort) {
-  const channel = await resolveTextChannel(client, session.channelId);
+  const channel = await resolveTextChannel(client, session.channelId, session.createdBy);
   if (!channel) {
     console.warn(`[scheduler] Could not resolve channel ${session.channelId} for 24h reminder of "${session.title}" — will retry next cycle`);
     return;
@@ -102,7 +102,7 @@ async function send24hReminder(client: Client, session: Session, messaging?: Mes
 }
 
 async function sendStartReminder(client: Client, session: Session, messaging?: MessagingPort) {
-  const channel = await resolveTextChannel(client, session.channelId);
+  const channel = await resolveTextChannel(client, session.channelId, session.createdBy);
   if (channel) {
     const mentions = session.rsvps.length > 0
       ? session.rsvps.map((uid) => `<@${uid}>`).join(" ")
@@ -149,6 +149,7 @@ async function sendStartReminder(client: Client, session: Session, messaging?: M
 async function resolveTextChannel(
   client: Client,
   channelId: string,
+  userId?: string,
 ): Promise<SendableChannels | null> {
   try {
     const channel = await client.channels.fetch(channelId);
@@ -161,6 +162,16 @@ async function resolveTextChannel(
     }
     console.warn(`[scheduler] Channel ${channelId} exists but is not sendable (type: ${channel?.type})`);
   } catch (err) {
+    // DM channels can't always be fetched by ID — fall back to opening a DM with the user
+    if (userId) {
+      try {
+        const user = await client.users.fetch(userId);
+        const dm = await user.createDM();
+        if (dm.isSendable()) return dm;
+      } catch (dmErr) {
+        console.warn(`[scheduler] Failed to open DM with user ${userId}:`, dmErr);
+      }
+    }
     console.warn(`[scheduler] Failed to fetch channel ${channelId}:`, err);
   }
   return null;

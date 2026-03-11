@@ -28,7 +28,8 @@ async function load(): Promise<Campaign[]> {
   if (!existsSync(filePath)) return [];
   try {
     const raw = await readFile(filePath, "utf-8");
-    return JSON.parse(raw) as Campaign[];
+    const campaigns = JSON.parse(raw) as Campaign[];
+    return campaigns.map((c) => ({ ...c, playerCount: c.playerCount ?? 0 }));
   } catch {
     return [];
   }

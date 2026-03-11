@@ -1,6 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { CONFIG } from "./config";
+import type { CampaignStore } from "./storage/port";
 
 export interface Campaign {
   id: string;
@@ -22,56 +20,41 @@ export interface Campaign {
   timezone: string;
 }
 
-const filePath = CONFIG.CAMPAIGNS_FILE;
+// ── Pluggable store (set once at startup via initCampaignStore) ──
 
-async function load(): Promise<Campaign[]> {
-  if (!existsSync(filePath)) return [];
-  try {
-    const raw = await readFile(filePath, "utf-8");
-    const campaigns = JSON.parse(raw) as Campaign[];
-    return campaigns.map((c) => ({ ...c, playerCount: c.playerCount ?? 0 }));
-  } catch {
-    return [];
-  }
-}
+let store: CampaignStore;
 
-async function save(campaigns: Campaign[]): Promise<void> {
-  await writeFile(filePath, JSON.stringify(campaigns, null, 2), "utf-8");
+/**
+ * Inject the concrete CampaignStore implementation.
+ * Must be called once at startup before any campaign function is used.
+ */
+export function initCampaignStore(s: CampaignStore): void {
+  store = s;
 }
 
 /** Return all stored campaigns */
 export async function getCampaigns(): Promise<Campaign[]> {
-  return load();
+  return store.getCampaigns();
 }
 
-/** Add a new campaign and persist to disk */
+/** Add a new campaign and persist */
 export async function addCampaign(campaign: Campaign): Promise<void> {
-  const campaigns = await load();
-  campaigns.push(campaign);
-  await save(campaigns);
+  return store.addCampaign(campaign);
 }
 
 /** Update a campaign in-place (matched by id) and persist */
 export async function updateCampaign(updated: Campaign): Promise<void> {
-  const campaigns = await load();
-  const idx = campaigns.findIndex((c) => c.id === updated.id);
-  if (idx !== -1) {
-    campaigns[idx] = updated;
-    await save(campaigns);
-  }
+  return store.updateCampaign(updated);
 }
 
 /** Remove a campaign by id and persist */
 export async function removeCampaign(id: string): Promise<void> {
-  let campaigns = await load();
-  campaigns = campaigns.filter((c) => c.id !== id);
-  await save(campaigns);
+  return store.removeCampaign(id);
 }
 
 /** List campaigns for a channel */
 export async function getChannelCampaigns(channelId: string): Promise<Campaign[]> {
-  const campaigns = await load();
-  return campaigns.filter((c) => c.channelId === channelId);
+  return store.getChannelCampaigns(channelId);
 }
 
 /**
@@ -79,12 +62,7 @@ export async function getChannelCampaigns(channelId: string): Promise<Campaign[]
  * This should be called when a new session is created (not on reschedule).
  */
 export async function nextSessionNumber(campaignId: string): Promise<number> {
-  const campaigns = await load();
-  const campaign = campaigns.find((c) => c.id === campaignId);
-  if (!campaign) return 1;
-  campaign.sessionCounter += 1;
-  await save(campaigns);
-  return campaign.sessionCounter;
+  return store.nextSessionNumber(campaignId);
 }
 
 /**
@@ -92,9 +70,5 @@ export async function nextSessionNumber(campaignId: string): Promise<number> {
  * Ensures the counter never goes below 0.
  */
 export async function decrementSessionCounter(campaignId: string): Promise<void> {
-  const campaigns = await load();
-  const campaign = campaigns.find((c) => c.id === campaignId);
-  if (!campaign) return;
-  campaign.sessionCounter = Math.max(0, campaign.sessionCounter - 1);
-  await save(campaigns);
+  return store.decrementSessionCounter(campaignId);
 }

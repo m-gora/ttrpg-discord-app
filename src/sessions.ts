@@ -1,6 +1,4 @@
-import { readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
-import { CONFIG } from "./config";
+import type { SessionStore } from "./storage/port";
 
 export interface Session {
   id: string;
@@ -36,56 +34,39 @@ export interface Session {
   remindedStart: boolean;
 }
 
-const filePath = CONFIG.SESSIONS_FILE;
+// ── Pluggable store (set once at startup via initSessionStore) ──
 
-async function load(): Promise<Session[]> {
-  if (!existsSync(filePath)) return [];
-  try {
-    const raw = await readFile(filePath, "utf-8");
-    return JSON.parse(raw) as Session[];
-  } catch {
-    return [];
-  }
-}
+let store: SessionStore;
 
-async function save(sessions: Session[]): Promise<void> {
-  await writeFile(filePath, JSON.stringify(sessions, null, 2), "utf-8");
+/**
+ * Inject the concrete SessionStore implementation.
+ * Must be called once at startup before any session function is used.
+ */
+export function initSessionStore(s: SessionStore): void {
+  store = s;
 }
 
 /** Return all stored sessions */
 export async function getSessions(): Promise<Session[]> {
-  return load();
+  return store.getSessions();
 }
 
-/** Add a new session and persist to disk */
+/** Add a new session and persist */
 export async function addSession(session: Session): Promise<void> {
-  const sessions = await load();
-  sessions.push(session);
-  await save(sessions);
+  return store.addSession(session);
 }
 
 /** Update a session in-place (matched by id) and persist */
 export async function updateSession(updated: Session): Promise<void> {
-  const sessions = await load();
-  const idx = sessions.findIndex((s) => s.id === updated.id);
-  if (idx !== -1) {
-    sessions[idx] = updated;
-    await save(sessions);
-  }
+  return store.updateSession(updated);
 }
 
 /** Remove a session by id and persist */
 export async function removeSession(id: string): Promise<void> {
-  let sessions = await load();
-  sessions = sessions.filter((s) => s.id !== id);
-  await save(sessions);
+  return store.removeSession(id);
 }
 
 /** List upcoming sessions for a guild, sorted by date */
 export async function getUpcomingSessions(guildId: string): Promise<Session[]> {
-  const sessions = await load();
-  const now = new Date();
-  return sessions
-    .filter((s) => s.guildId === guildId && new Date(s.date) > now)
-    .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+  return store.getUpcomingSessions(guildId);
 }

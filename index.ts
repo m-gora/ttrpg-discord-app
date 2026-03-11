@@ -15,11 +15,20 @@ import { startSessionCancelConsumer } from "./src/consumers/session-cancel";
 import { startRsvpConsumers } from "./src/consumers/rsvp";
 import { startCampaignConsumers } from "./src/consumers/campaign";
 import type { MessagingPort } from "./src/messaging/port";
+import { createJsonStorage } from "./src/storage";
+import { initCampaignStore } from "./src/campaigns";
+import { initSessionStore } from "./src/sessions";
 
 if (!CONFIG.TOKEN) {
   console.error("❌ DISCORD_TOKEN is not set. Create a .env file (see .env.example).");
   process.exit(1);
 }
+
+// ── Storage ───────────────────────────────────────────────
+
+const storage = createJsonStorage(CONFIG.SESSIONS_FILE, CONFIG.CAMPAIGNS_FILE);
+initSessionStore(storage.sessions);
+initCampaignStore(storage.campaigns);
 
 // ── Messaging (optional — runs fine without NATS) ─────────
 

@@ -6,6 +6,14 @@
 
 A Discord bot for scheduling and managing tabletop RPG sessions. It serves small gaming groups who need a lightweight way to coordinate game nights without leaving Discord.
 
+#### Why not Discord's built-in Scheduled Events?
+
+Discord's native events are deliberately rigid: you can set a recurring weekly slot, but there is no mechanism to automatically find an alternative date when the full party can't make it. The bot fills that gap with RSVP tracking and reschedule polls that propose new dates when a player declines.
+
+The project originally aimed to work in group DMs as well (via user installs), but Discord's bot platform does not allow bots to send autonomous messages into DMs — only command responses. Since automated reminders and polls are central to the bot's value, the scope was narrowed to guild installs only.
+
+Looking ahead, the bot is intended to grow into a broader TTRPG management tool with features beyond what Discord events can offer.
+
 | Requirement | Description |
 |---|---|
 | **Session scheduling** | Create, list, and cancel sessions with timezone-aware date/time |
@@ -41,6 +49,7 @@ A Discord bot for scheduling and managing tabletop RPG sessions. It serves small
 | Constraint | Explanation |
 |---|---|
 | Single replica | Discord enforces one gateway connection per bot token |
+| Guild-only install | Bot operates exclusively as a guild install; DM and user-install interactions are not supported |
 | Bun runtime | Used for fast startup, built-in SQLite, and TypeScript-native execution |
 | Distroless image | No shell available in production — limits debugging but reduces attack surface |
 | NATS JetStream | Chosen for durable event delivery; optional dependency |
@@ -70,7 +79,7 @@ A Discord bot for scheduling and managing tabletop RPG sessions. It serves small
 
 | Actor | Interaction |
 |---|---|
-| **Discord Users** | Create/cancel sessions and campaigns via `/session` and `/campaign` slash commands; click Attend/Decline buttons on session cards; vote in reschedule polls |
+| **Discord Users** | Create/cancel sessions and campaigns via `/session` and `/campaign` slash commands in guild channels; click Attend/Decline buttons on session cards; vote in reschedule polls |
 | **TTRPG Discord App** | Sends session cards, reminders, reschedule polls; manages state |
 
 ### 3.2 Technical Context
@@ -505,7 +514,6 @@ Quality
 |---|---|---|
 | Single replica = no HA | Bot offline during rollouts (~10s) | `Recreate` strategy minimises dual-instance window |
 | JSON file storage lacks atomicity | Concurrent writes could corrupt state | Single replica prevents concurrency; SQLite adapter available |
-| `guildId` empty for DM sessions | Channel resolution and `getUpcomingSessions` may not work | Ensure sessions are created in guild context |
 | PVC size limits | NATS JetStream `insufficient storage` errors | Sized PVC to 1 Gi with 512 MB JetStream file limit |
 | Distroless limits debugging | Cannot exec into container | Use ephemeral debug containers or temporary PVC-mounting pods |
 | 60-second scheduler granularity | Reminders can be up to 60s late | Acceptable for a TTRPG scheduling bot |

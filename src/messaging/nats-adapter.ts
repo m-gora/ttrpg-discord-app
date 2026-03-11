@@ -145,20 +145,29 @@ export class NatsAdapter implements MessagingPort {
   private async ensureStream(): Promise<void> {
     if (!this.jsm) return;
 
+    const streamConfig = {
+      name: STREAM_NAME,
+      subjects: STREAM_SUBJECTS,
+      retention: "limits" as any,
+      max_bytes: 64 * 1024 * 1024, // 64 MB — plenty for a low-volume bot
+      max_age: 7 * 24 * 60 * 60 * 1_000_000_000, // 7 days in nanos
+      storage: "file" as any,
+      num_replicas: 1,
+    };
+
     try {
       await this.jsm.streams.info(STREAM_NAME);
-      console.log(`[nats] Stream "${STREAM_NAME}" already exists`);
-    } catch {
-      await this.jsm.streams.add({
-        name: STREAM_NAME,
-        subjects: STREAM_SUBJECTS,
-        retention: "limits" as any,
-        max_bytes: 256 * 1024 * 1024, // 256 MB — must be less than JetStream max_file
-        max_age: 30 * 24 * 60 * 60 * 1_000_000_000, // 30 days in nanos
-        storage: "file" as any,
-        num_replicas: 1,
-      });
-      console.log(`[nats] Stream "${STREAM_NAME}" created`);
+      // Stream exists — update to ensure config stays in sync
+      await this.jsm.streams.update(STREAM_NAME, streamConfig);
+      console.log(`[nats] Stream "${STREAM_NAME}" already exists (config updated)`);
+    } catch (updateErr) {
+      try {
+        await this.jsm.streams.add(streamConfig);
+        console.log(`[nats] Stream "${STREAM_NAME}" created`);
+      } catch (addErr) {
+        console.error(`[nats] Failed to create/update stream "${STREAM_NAME}":`, addErr);
+        console.warn(`[nats] Continuing without stream guarantee — publish/subscribe may fail`);
+      }
     }
   }
 }

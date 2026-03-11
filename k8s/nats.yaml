@@ -15,7 +15,7 @@ data:
     jetstream {
       store_dir: /data/jetstream
       max_mem: 64M
-      max_file: 384M
+      max_file: 512M
     }
 
     lame_duck_duration: 30s
@@ -129,4 +129,4 @@ spec:
           - ReadWriteOnce
         resources:
           requests:
-            storage: 512Mi
+            storage: 1Gi

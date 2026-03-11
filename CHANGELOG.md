@@ -1,3 +1,13 @@
+## [1.2.0](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.8...v1.2.0) (2026-03-11)
+
+### Features
+
+* add recurring sessions ([e852071](https://github.com/m-gora/ttrpg-discord-app/commit/e8520715f6fce1e14a9b66d047d9c284b7b9d887))
+
+### Bug Fixes
+
+* also use the infrastructure abstraction ([c12f13c](https://github.com/m-gora/ttrpg-discord-app/commit/c12f13c2be82df6a576af7c1d5108be6fdfb49ef))
+
 ## [1.1.8](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.7...v1.1.8) (2026-03-11)
 
 ### Refactors

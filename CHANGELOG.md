@@ -1,3 +1,9 @@
+## [1.1.4](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.3...v1.1.4) (2026-03-11)
+
+### Bug Fixes
+
+* send reminder as long as it hasn't been sent ([980e908](https://github.com/m-gora/ttrpg-discord-app/commit/980e90827e4cf2b5648ffe267e22eab17f8e104d))
+
 ## [1.1.3](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.2...v1.1.3) (2026-03-11)
 
 ### Bug Fixes

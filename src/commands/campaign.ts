@@ -11,6 +11,7 @@ import {
   getChannelCampaigns,
   type Campaign,
 } from "../campaigns";
+import { CONFIG } from "../config";
 import type { MessagingPort } from "../messaging/port";
 import { Subjects } from "../messaging/events";
 import type {
@@ -46,6 +47,20 @@ export const data = new SlashCommandBuilder()
           .setName("vtt")
           .setDescription("Link to the VTT (Foundry, Roll20, etc.)")
           .setRequired(false),
+      )
+      .addIntegerOption((opt) =>
+        opt
+          .setName("players")
+          .setDescription("Total number of players + GM")
+          .setRequired(true)
+          .setMinValue(1)
+          .setMaxValue(20),
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("timezone")
+          .setDescription(`IANA timezone, e.g. Europe/Rome (default: ${CONFIG.DEFAULT_TIMEZONE})`)
+          .setRequired(false),
       ),
   )
   .addSubcommand((sub) =>
@@ -68,6 +83,20 @@ export const data = new SlashCommandBuilder()
         opt
           .setName("vtt")
           .setDescription("New VTT link")
+          .setRequired(false),
+      )
+      .addIntegerOption((opt) =>
+        opt
+          .setName("players")
+          .setDescription("New total number of players + GM")
+          .setRequired(false)
+          .setMinValue(1)
+          .setMaxValue(20),
+      )
+      .addStringOption((opt) =>
+        opt
+          .setName("timezone")
+          .setDescription("New IANA timezone, e.g. Europe/Rome")
           .setRequired(false),
       ),
   )
@@ -121,6 +150,8 @@ async function handleCreate(
 
   const name = interaction.options.getString("name", true);
   const vtt = interaction.options.getString("vtt") ?? "";
+  const playerCount = interaction.options.getInteger("players", true);
+  const timezone = interaction.options.getString("timezone") ?? CONFIG.DEFAULT_TIMEZONE;
 
   const campaign: Campaign = {
     id: randomUUID().slice(0, 8),
@@ -128,8 +159,10 @@ async function handleCreate(
     guildId: interaction.guildId ?? "",
     name,
     vttLink: vtt,
+    playerCount,
     sessionCounter: 0,
     createdBy: interaction.user.id,
+    timezone,
   };
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -173,6 +206,8 @@ async function handleEdit(
 
   const newName = interaction.options.getString("name");
   const newVtt = interaction.options.getString("vtt");
+  const newPlayerCount = interaction.options.getInteger("players");
+  const newTimezone = interaction.options.getString("timezone");
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -183,6 +218,8 @@ async function handleEdit(
       channelId: interaction.channelId,
       newName,
       newVtt,
+      newPlayerCount,
+      newTimezone,
       interactionToken: interaction.token,
       applicationId: interaction.applicationId,
     },
@@ -209,7 +246,8 @@ async function handleList(interaction: ChatInputCommandInteraction) {
       campaigns
         .map((c) => {
           const vtt = c.vttLink ? `🔗 [VTT](${c.vttLink})` : "*(no VTT link)*";
-          return `**${c.name}** — ${c.sessionCounter} session(s)\n${vtt} | ID: \`${c.id}\``;
+          const tz = c.timezone ? `🕐 ${c.timezone}` : "🕐 UTC";
+          return `**${c.name}** — ${c.sessionCounter} session(s) · ${c.playerCount} players\n${vtt} | ${tz} | ID: \`${c.id}\``;
         })
         .join("\n\n"),
     );

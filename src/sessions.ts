@@ -18,6 +18,8 @@ export interface Session {
   campaignId: string;
   /** VTT link (copied from the campaign at creation time) */
   vttLink: string;
+  /** Total players + GM (copied from campaign, or set manually) */
+  playerCount: number;
   /** Discord message ID of the session card (for editing the embed) */
   messageId: string;
   /** Array of user IDs who have RSVPd (attending) */

@@ -7,7 +7,7 @@ import {
 } from "discord.js";
 import type { Session } from "./sessions";
 import { getSessions, updateSession } from "./sessions";
-import { buildSessionCard, countChannelMembers } from "./session-card";
+import { buildSessionCard } from "./session-card";
 import type { MessagingPort } from "./messaging/port";
 import { Subjects } from "./messaging/events";
 import type {
@@ -164,8 +164,7 @@ async function processReschedulePoll(
   await channel.send({ embeds: [resultEmbed] });
 
   // Post a fresh session card with RSVP button
-  const memberCount = await countChannelMembers(channel);
-  const { embed, row } = buildSessionCard(session, memberCount);
+  const { embed, row } = buildSessionCard(session);
   const newCard = await channel.send({
     embeds: [embed],
     components: [row],

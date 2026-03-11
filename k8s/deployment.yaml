@@ -25,13 +25,8 @@ spec:
           envFrom:
             - secretRef:
                 name: ttrpg-discord-app
-          env:
-            - name: SESSIONS_FILE
-              value: /data/sessions.json
-            - name: CAMPAIGNS_FILE
-              value: /data/campaigns.json
-            - name: NATS_URL
-              value: nats://nats.ttrpg.svc.cluster.local:4222
+            - configMapRef:
+                name: ttrpg-discord-app
           volumeMounts:
             - name: data
               mountPath: /data

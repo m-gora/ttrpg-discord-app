@@ -4,9 +4,6 @@ import {
   ButtonBuilder,
   ButtonStyle,
   time,
-  TextChannel,
-  ChannelType,
-  type Channel,
 } from "discord.js";
 import type { Session } from "./sessions";
 
@@ -17,15 +14,14 @@ export const DECLINE_BUTTON_PREFIX = "decline_";
 
 /**
  * Build the session card embed and Attend / Don't Attend action row.
- * `memberCount` is the total number of (non-bot) members in the channel.
  */
 export function buildSessionCard(
   session: Session,
-  memberCount: number,
 ): { embed: EmbedBuilder; row: ActionRowBuilder<ButtonBuilder> } {
   const d = new Date(session.date);
   const attendCount = session.rsvps.length;
   const declinedCount = (session.declined ?? []).length;
+  const total = session.playerCount;
 
   const attendList =
     attendCount > 0
@@ -43,7 +39,7 @@ export function buildSessionCard(
         value: `${time(d, "F")} (${time(d, "R")})`,
       },
       {
-        name: `✅ Attending — ${attendCount}/${memberCount}`,
+        name: `✅ Attending — ${attendCount}/${total}`,
         value: attendList,
       },
       {
@@ -79,35 +75,4 @@ export function buildSessionCard(
   );
 
   return { embed, row };
-}
-
-/**
- * Count members in a channel, excluding bots.
- * Works for guild text channels, group DMs, and DMs.
- */
-export async function countChannelMembers(
-  channel: Channel,
-): Promise<number> {
-  // Guild text channel – fetch members and check permissions
-  if (channel instanceof TextChannel) {
-    const guild = channel.guild;
-    await guild.members.fetch();
-    return guild.members.cache.filter(
-      (m) => !m.user.bot && channel.permissionsFor(m)?.has("ViewChannel"),
-    ).size;
-  }
-
-  // Group DM – recipients is a Collection of PartialRecipient (excludes the client user)
-  if (channel.type === ChannelType.GroupDM && "recipients" in channel) {
-    const recipients = (channel as unknown as { recipients: { size: number } }).recipients;
-    // +1 because the collection excludes the current (client) user
-    return (recipients?.size ?? 0) + 1;
-  }
-
-  // Regular DM – just the other person
-  if (channel.type === ChannelType.DM) {
-    return 2;
-  }
-
-  return 1;
 }

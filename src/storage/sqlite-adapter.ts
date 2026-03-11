@@ -20,6 +20,7 @@ const MIGRATIONS = /* sql */ `
     created_by          TEXT NOT NULL,
     campaign_id         TEXT NOT NULL DEFAULT '',
     vtt_link            TEXT NOT NULL DEFAULT '',
+    player_count        INTEGER NOT NULL DEFAULT 0,
     message_id          TEXT NOT NULL DEFAULT '',
     rsvps               TEXT NOT NULL DEFAULT '[]',
     declined            TEXT NOT NULL DEFAULT '[]',
@@ -35,8 +36,10 @@ const MIGRATIONS = /* sql */ `
     guild_id         TEXT NOT NULL,
     name             TEXT NOT NULL,
     vtt_link         TEXT NOT NULL DEFAULT '',
+    player_count     INTEGER NOT NULL DEFAULT 0,
     session_counter  INTEGER NOT NULL DEFAULT 0,
-    created_by       TEXT NOT NULL
+    created_by       TEXT NOT NULL,
+    timezone         TEXT NOT NULL DEFAULT 'UTC'
   );
 
   CREATE INDEX IF NOT EXISTS idx_sessions_guild_date ON sessions (guild_id, date);
@@ -54,6 +57,7 @@ interface SessionRow {
   created_by: string;
   campaign_id: string;
   vtt_link: string;
+  player_count: number;
   message_id: string;
   rsvps: string;
   declined: string;
@@ -73,6 +77,7 @@ function rowToSession(r: SessionRow): Session {
     createdBy: r.created_by,
     campaignId: r.campaign_id,
     vttLink: r.vtt_link,
+    playerCount: r.player_count,
     messageId: r.message_id,
     rsvps: JSON.parse(r.rsvps) as string[],
     declined: JSON.parse(r.declined) as string[],
@@ -89,8 +94,10 @@ interface CampaignRow {
   guild_id: string;
   name: string;
   vtt_link: string;
+  player_count: number;
   session_counter: number;
   created_by: string;
+  timezone: string;
 }
 
 function rowToCampaign(r: CampaignRow): Campaign {
@@ -100,8 +107,10 @@ function rowToCampaign(r: CampaignRow): Campaign {
     guildId: r.guild_id,
     name: r.name,
     vttLink: r.vtt_link,
+    playerCount: r.player_count,
     sessionCounter: r.session_counter,
     createdBy: r.created_by,
+    timezone: r.timezone,
   };
 }
 
@@ -110,25 +119,25 @@ function rowToCampaign(r: CampaignRow): Campaign {
 function createSessionStore(db: Database): SessionStore {
   const insertStmt = db.prepare<void, [
     string, string, string, string, string, string,
-    string, string, string, string, string,
+    string, string, number, string, string, string,
     number, string, number, number,
   ]>(`
     INSERT INTO sessions
       (id, guild_id, channel_id, title, date, created_by,
-       campaign_id, vtt_link, message_id, rsvps, declined,
+       campaign_id, vtt_link, player_count, message_id, rsvps, declined,
        reschedule_active, reschedule_message_id, reminded_24h, reminded_start)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
   const updateStmt = db.prepare<void, [
     string, string, string, string, string,
-    string, string, string, string,
+    string, string, number, string, string, string,
     number, string, number, number,
     string,
   ]>(`
     UPDATE sessions SET
       guild_id = ?, channel_id = ?, title = ?, date = ?, created_by = ?,
-      campaign_id = ?, vtt_link = ?, message_id = ?, rsvps = ?, declined = ?,
+      campaign_id = ?, vtt_link = ?, player_count = ?, message_id = ?, rsvps = ?, declined = ?,
       reschedule_active = ?, reschedule_message_id = ?,
       reminded_24h = ?, reminded_start = ?
     WHERE id = ?
@@ -148,7 +157,8 @@ function createSessionStore(db: Database): SessionStore {
       insertStmt.run(
         session.id, session.guildId, session.channelId,
         session.title, session.date, session.createdBy,
-        session.campaignId, session.vttLink, session.messageId,
+        session.campaignId, session.vttLink, session.playerCount,
+        session.messageId,
         JSON.stringify(session.rsvps), JSON.stringify(session.declined),
         session.rescheduleActive ? 1 : 0,
         session.rescheduleMessageId,
@@ -161,7 +171,7 @@ function createSessionStore(db: Database): SessionStore {
       updateStmt.run(
         updated.guildId, updated.channelId, updated.title,
         updated.date, updated.createdBy, updated.campaignId,
-        updated.vttLink, updated.messageId,
+        updated.vttLink, updated.playerCount, updated.messageId,
         JSON.stringify(updated.rsvps), JSON.stringify(updated.declined),
         updated.rescheduleActive ? 1 : 0,
         updated.rescheduleMessageId,
@@ -189,15 +199,15 @@ function createSessionStore(db: Database): SessionStore {
 // ── Campaign store ──────────────────────────────────────
 
 function createCampaignStore(db: Database): CampaignStore {
-  const insertStmt = db.prepare<void, [string, string, string, string, string, number, string]>(`
-    INSERT INTO campaigns (id, channel_id, guild_id, name, vtt_link, session_counter, created_by)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+  const insertStmt = db.prepare<void, [string, string, string, string, string, number, number, string, string]>(`
+    INSERT INTO campaigns (id, channel_id, guild_id, name, vtt_link, player_count, session_counter, created_by, timezone)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
   `);
 
-  const updateStmt = db.prepare<void, [string, string, string, string, number, string, string]>(`
+  const updateStmt = db.prepare<void, [string, string, string, string, number, number, string, string, string]>(`
     UPDATE campaigns SET
       channel_id = ?, guild_id = ?, name = ?, vtt_link = ?,
-      session_counter = ?, created_by = ?
+      player_count = ?, session_counter = ?, created_by = ?, timezone = ?
     WHERE id = ?
   `);
 
@@ -213,16 +223,16 @@ function createCampaignStore(db: Database): CampaignStore {
     async addCampaign(campaign) {
       insertStmt.run(
         campaign.id, campaign.channelId, campaign.guildId,
-        campaign.name, campaign.vttLink, campaign.sessionCounter,
-        campaign.createdBy,
+        campaign.name, campaign.vttLink, campaign.playerCount,
+        campaign.sessionCounter, campaign.createdBy, campaign.timezone,
       );
     },
 
     async updateCampaign(updated) {
       updateStmt.run(
         updated.channelId, updated.guildId, updated.name,
-        updated.vttLink, updated.sessionCounter, updated.createdBy,
-        updated.id,
+        updated.vttLink, updated.playerCount, updated.sessionCounter,
+        updated.createdBy, updated.timezone, updated.id,
       );
     },
 

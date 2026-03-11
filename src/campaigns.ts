@@ -12,10 +12,14 @@ export interface Campaign {
   name: string;
   /** URL to the virtual tabletop (Foundry, Roll20, etc.) */
   vttLink: string;
+  /** Total number of players + GM in this campaign */
+  playerCount: number;
   /** Auto-incrementing session counter (not counting cancelled sessions) */
   sessionCounter: number;
   /** User who created the campaign */
   createdBy: string;
+  /** IANA timezone for sessions in this campaign, e.g. "Europe/Rome" */
+  timezone: string;
 }
 
 const filePath = CONFIG.CAMPAIGNS_FILE;

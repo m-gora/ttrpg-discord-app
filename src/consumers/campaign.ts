@@ -46,6 +46,8 @@ export async function startCampaignConsumers(messaging: MessagingPort): Promise<
           { name: "Name", value: campaign.name, inline: true },
           { name: "ID", value: `\`${campaign.id}\``, inline: true },
           { name: "VTT", value: campaign.vttLink || "*not set*", inline: true },
+          { name: "Players", value: String(campaign.playerCount), inline: true },
+          { name: "Timezone", value: campaign.timezone || "UTC", inline: true },
           { name: "Sessions so far", value: "0", inline: true },
         )
         .setFooter({ text: `Created by ${createdByDisplayName}` });
@@ -70,7 +72,7 @@ export async function startCampaignConsumers(messaging: MessagingPort): Promise<
     Subjects.CAMPAIGN_EDIT_REQUESTED,
     EDIT_CONSUMER,
     async (envelope: EventEnvelope<CampaignEditRequestedEvent>) => {
-      const { campaignId, channelId, newName, newVtt, interactionToken, applicationId } =
+      const { campaignId, channelId, newName, newVtt, newPlayerCount, newTimezone, interactionToken, applicationId } =
         envelope.data;
 
       const campaigns = await getChannelCampaigns(channelId);
@@ -85,10 +87,14 @@ export async function startCampaignConsumers(messaging: MessagingPort): Promise<
 
       if (newName) campaign.name = newName;
       if (newVtt !== null && newVtt !== undefined) campaign.vttLink = newVtt;
+      if (newPlayerCount !== null && newPlayerCount !== undefined) campaign.playerCount = newPlayerCount;
+      if (newTimezone !== null && newTimezone !== undefined) campaign.timezone = newTimezone;
 
       const updatedFields: string[] = [];
       if (newName) updatedFields.push("name");
       if (newVtt !== null && newVtt !== undefined) updatedFields.push("vttLink");
+      if (newPlayerCount !== null && newPlayerCount !== undefined) updatedFields.push("playerCount");
+      if (newTimezone !== null && newTimezone !== undefined) updatedFields.push("timezone");
 
       await updateCampaign(campaign);
 
@@ -98,6 +104,8 @@ export async function startCampaignConsumers(messaging: MessagingPort): Promise<
         .addFields(
           { name: "Name", value: campaign.name, inline: true },
           { name: "VTT", value: campaign.vttLink || "*not set*", inline: true },
+          { name: "Players", value: String(campaign.playerCount), inline: true },
+          { name: "Timezone", value: campaign.timezone || "UTC", inline: true },
         );
 
       await editDeferredReply(applicationId, interactionToken, {

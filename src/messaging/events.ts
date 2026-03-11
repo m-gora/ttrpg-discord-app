@@ -56,8 +56,6 @@ export type Subject = (typeof Subjects)[keyof typeof Subjects];
 export interface SessionCreateRequestedEvent {
   /** Pre-built session object (without messageId — set by the consumer) */
   session: Omit<Session, "messageId"> & { messageId: "" };
-  /** Number of non-bot members in the channel (for the RSVP card) */
-  memberCount: number;
   /** Display name of the user who ran the command (for the embed footer) */
   createdByDisplayName: string;
   /** Discord interaction token — needed to edit the deferred reply */
@@ -183,6 +181,8 @@ export interface CampaignEditRequestedEvent extends InteractionContext {
   channelId: string;
   newName: string | null;
   newVtt: string | null;
+  newPlayerCount: number | null;
+  newTimezone: string | null;
 }
 
 export interface CampaignDeleteRequestedEvent extends InteractionContext {

@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ttrpg-discord-app
+  namespace: ttrpg
+  labels:
+    app.kubernetes.io/name: ttrpg-discord-app
+data:
+  SESSIONS_FILE: /data/sessions.json
+  CAMPAIGNS_FILE: /data/campaigns.json
+  NATS_URL: nats://nats.ttrpg.svc.cluster.local:4222
+  DEFAULT_TIMEZONE: Europe/Rome

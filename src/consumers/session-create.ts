@@ -27,13 +27,12 @@ export async function startSessionCreateConsumer(messaging: MessagingPort): Prom
     async (envelope: EventEnvelope<SessionCreateRequestedEvent>) => {
       const {
         session,
-        memberCount,
         createdByDisplayName,
         interactionToken,
         applicationId,
       } = envelope.data;
 
-      const { embed, row } = buildSessionCard(session, memberCount);
+      const { embed, row } = buildSessionCard(session);
       embed.setFooter({ text: `Created by ${createdByDisplayName}` });
 
       // Edit the deferred interaction reply via Discord's webhook API

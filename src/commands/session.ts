@@ -11,8 +11,8 @@ import { randomUUID } from "node:crypto";
 import {
   getUpcomingSessions,
 } from "../sessions";
-import { countChannelMembers } from "../session-card";
 import { getChannelCampaigns, nextSessionNumber } from "../campaigns";
+import { CONFIG } from "../config";
 import type { MessagingPort } from "../messaging/port";
 import { Subjects } from "../messaging/events";
 import type { SessionCreateRequestedEvent, SessionCancelRequestedEvent } from "../messaging/events";
@@ -48,7 +48,7 @@ export const data = new SlashCommandBuilder()
       .addStringOption((opt) =>
         opt
           .setName("timezone")
-          .setDescription("IANA timezone, e.g. Europe/Rome (default: UTC)")
+          .setDescription(`IANA timezone, e.g. Europe/Rome (default: ${CONFIG.DEFAULT_TIMEZONE})`)
           .setRequired(false),
       )
       .addStringOption((opt) =>
@@ -106,27 +106,8 @@ async function handleCreate(
 
   const titleOpt = interaction.options.getString("title");
   const dateStr = interaction.options.getString("date", true);
-  const tz = interaction.options.getString("timezone") ?? "UTC";
+  const tzOpt = interaction.options.getString("timezone");
   const campaignIdOpt = interaction.options.getString("campaign");
-
-  // Parse the user-supplied date in the given timezone
-  const parsed = parseDateInTZ(dateStr, tz);
-  if (!parsed || Number.isNaN(parsed.getTime())) {
-    await interaction.reply({
-      content:
-        "❌ Invalid date. Please use the format `YYYY-MM-DD HH:mm` and a valid IANA timezone.",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
-
-  if (parsed.getTime() < Date.now()) {
-    await interaction.reply({
-      content: "❌ That date is in the past!",
-      flags: MessageFlags.Ephemeral,
-    });
-    return;
-  }
 
   const id = randomUUID().slice(0, 8);
 
@@ -143,6 +124,8 @@ async function handleCreate(
   let title = titleOpt ?? "";
   let campaignId = "";
   let vttLink = "";
+  let playerCount = 0;
+  let campaignTz = "";
 
   if (campaignIdOpt) {
     const campaigns = await getChannelCampaigns(interaction.channelId);
@@ -159,6 +142,30 @@ async function handleCreate(
     title = title || `${campaign.name} — Session ${sessionNum}`;
     campaignId = campaign.id;
     vttLink = campaign.vttLink;
+    playerCount = campaign.playerCount;
+    campaignTz = campaign.timezone ?? "";
+  }
+
+  // Timezone priority: explicit option > campaign setting > global default
+  const tz = tzOpt || campaignTz || CONFIG.DEFAULT_TIMEZONE;
+
+  // Parse the user-supplied date in the resolved timezone
+  const parsed = parseDateInTZ(dateStr, tz);
+  if (!parsed || Number.isNaN(parsed.getTime())) {
+    await interaction.reply({
+      content:
+        "❌ Invalid date. Please use the format `YYYY-MM-DD HH:mm` and a valid IANA timezone.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
+  if (parsed.getTime() < Date.now()) {
+    await interaction.reply({
+      content: "❌ That date is in the past!",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
   }
 
   if (!title) {
@@ -178,6 +185,7 @@ async function handleCreate(
     createdBy: interaction.user.id,
     campaignId,
     vttLink,
+    playerCount,
     messageId: "" as const,
     rsvps: [] as string[],
     declined: [] as string[],
@@ -187,9 +195,6 @@ async function handleCreate(
     remindedStart: false,
   };
 
-  // Count non-bot members who can see this channel
-  const memberCount = await countChannelMembers(channel);
-
   // Defer the reply — the consumer will edit it once it processes the event
   await interaction.deferReply();
 
@@ -197,7 +202,6 @@ async function handleCreate(
     Subjects.SESSION_CREATE_REQUESTED,
     {
       session,
-      memberCount,
       createdByDisplayName: interaction.user.displayName,
       interactionToken: interaction.token,
       applicationId: interaction.applicationId,

@@ -10,7 +10,7 @@
 
 import { REST, type Client } from "discord.js";
 import { type Session, getSessions, updateSession } from "../sessions";
-import { buildSessionCard, countChannelMembers } from "../session-card";
+import { buildSessionCard } from "../session-card";
 import { openReschedulePoll } from "../reschedule-poll";
 import { Subjects } from "../messaging/events";
 import type {
@@ -126,17 +126,13 @@ export async function startRsvpConsumers(
  * which edits the original message the button belongs to.
  */
 async function updateSessionCard(
-  client: Client,
+  _client: Client,
   session: Session,
-  channelId: string,
+  _channelId: string,
   applicationId: string,
   interactionToken: string,
 ): Promise<void> {
-  const channel = await client.channels.fetch(channelId);
-  if (!channel) return;
-
-  const memberCount = await countChannelMembers(channel);
-  const { embed, row } = buildSessionCard(session, memberCount);
+  const { embed, row } = buildSessionCard(session);
 
   // Edit the original message via the component interaction webhook
   const rest = new REST({ version: "10" });

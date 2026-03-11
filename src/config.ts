@@ -11,4 +11,6 @@ export const CONFIG = {
   CAMPAIGNS_FILE: process.env.CAMPAIGNS_FILE ?? "./campaigns.json",
   /** NATS server URL (set to empty string to disable event publishing) */
   NATS_URL: process.env.NATS_URL ?? "",
+  /** Default IANA timezone when not specified by a campaign or command option */
+  DEFAULT_TIMEZONE: process.env.DEFAULT_TIMEZONE ?? "UTC",
 } as const;

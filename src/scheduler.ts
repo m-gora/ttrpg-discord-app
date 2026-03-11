@@ -155,7 +155,11 @@ async function resolveTextChannel(
     if (channel?.isSendable()) {
       return channel;
     }
-    console.warn(`[scheduler] Channel ${channelId} exists but is not sendable`);
+    // Partial DM/group DM channels may not report as sendable — check isTextBased as fallback
+    if (channel?.isTextBased() && "send" in channel) {
+      return channel as SendableChannels;
+    }
+    console.warn(`[scheduler] Channel ${channelId} exists but is not sendable (type: ${channel?.type})`);
   } catch (err) {
     console.warn(`[scheduler] Failed to fetch channel ${channelId}:`, err);
   }

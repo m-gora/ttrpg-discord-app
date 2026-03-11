@@ -35,20 +35,27 @@ async function checkReminders(client: Client, messaging?: MessagingPort) {
   const sessions = await getSessions();
   const now = Date.now();
 
+  if (sessions.length === 0) return;
+  console.log(`[scheduler] Checking ${sessions.length} session(s)`);
+
   for (const session of sessions) {
     const sessionTime = new Date(session.date).getTime();
     const timeUntil = sessionTime - now;
+    const hoursUntil = (timeUntil / 3_600_000).toFixed(1);
 
     if (shouldSend24hReminder(session, timeUntil)) {
+      console.log(`[scheduler] Sending 24h reminder for "${session.title}" (${hoursUntil}h away)`);
       await send24hReminder(client, session, messaging);
     }
 
     if (shouldSendStartReminder(session, timeUntil)) {
+      console.log(`[scheduler] Sending start reminder for "${session.title}"`);
       await sendStartReminder(client, session, messaging);
     }
 
     // Cleanup old sessions (1 hour after start)
     if (timeUntil < -60 * 60 * 1000) {
+      console.log(`[scheduler] Cleaning up old session "${session.title}" (${session.id})`);
       await removeSession(session.id);
       await messaging?.publish<SessionCleanedUpEvent>(Subjects.SESSION_CLEANED_UP, {
         sessionId: session.id,
@@ -59,7 +66,7 @@ async function checkReminders(client: Client, messaging?: MessagingPort) {
 }
 
 function shouldSend24hReminder(session: { reminded24h: boolean }, timeUntil: number): boolean {
-  return !session.reminded24h && timeUntil <= ONE_DAY_MS && timeUntil > ONE_DAY_MS - FIVE_MIN_MS;
+  return !session.reminded24h && timeUntil <= ONE_DAY_MS && timeUntil > 0;
 }
 
 function shouldSendStartReminder(session: { remindedStart: boolean }, timeUntil: number): boolean {
@@ -78,6 +85,9 @@ async function send24hReminder(client: Client, session: Session, messaging?: Mes
           `📅 ${time(d, "F")} (${time(d, "R")})`,
       );
     await channel.send({ content: "@everyone", embeds: [embed] });
+    console.log(`[scheduler] 24h reminder sent for "${session.title}" in channel ${session.channelId}`);
+  } else {
+    console.warn(`[scheduler] Could not resolve channel ${session.channelId} for 24h reminder of "${session.title}"`);
   }
   session.reminded24h = true;
   await updateSession(session);
@@ -119,6 +129,9 @@ async function sendStartReminder(client: Client, session: Session, messaging?: M
     }
 
     await channel.send({ content: mentions, embeds: [embed], components });
+    console.log(`[scheduler] Start reminder sent for "${session.title}" in channel ${session.channelId}`);
+  } else {
+    console.warn(`[scheduler] Could not resolve channel ${session.channelId} for start reminder of "${session.title}"`);
   }
   session.remindedStart = true;
   await updateSession(session);
@@ -139,8 +152,9 @@ async function resolveTextChannel(
     if (channel?.isSendable()) {
       return channel;
     }
-  } catch {
-    // channel may have been deleted
+    console.warn(`[scheduler] Channel ${channelId} exists but is not sendable`);
+  } catch (err) {
+    console.warn(`[scheduler] Failed to fetch channel ${channelId}:`, err);
   }
   return null;
 }

@@ -141,6 +141,9 @@ async function processReschedulePoll(
   if (!winningDate) return;
 
   // Update the session with the new date and reset state
+  if (!session.originalDate) {
+    session.originalDate = session.date;
+  }
   session.date = winningDate.date.toISOString();
   session.rescheduleActive = false;
   session.rescheduleMessageId = "";
@@ -164,7 +167,7 @@ async function processReschedulePoll(
   await channel.send({ embeds: [resultEmbed] });
 
   // Post a fresh session card with RSVP button
-  const { embed, row } = buildSessionCard(session);
+  const { embed, row } = await buildSessionCard(session);
   const newCard = await channel.send({
     embeds: [embed],
     components: [row],

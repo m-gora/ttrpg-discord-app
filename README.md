@@ -54,6 +54,10 @@ bun run index.ts
 | `/session list` | Show upcoming sessions |
 | `/session cancel id:"abc12345"` | Cancel a session |
 
+## Guides
+
+- [Recurring Sessions](docs/recurring-sessions.md) — set up automatic session scheduling for campaigns
+
 ## Tech Stack
 
 - **Runtime:** [Bun](https://bun.sh)

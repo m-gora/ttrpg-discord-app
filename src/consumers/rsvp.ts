@@ -132,7 +132,7 @@ async function updateSessionCard(
   applicationId: string,
   interactionToken: string,
 ): Promise<void> {
-  const { embed, row } = buildSessionCard(session);
+  const { embed, row } = await buildSessionCard(session);
 
   // Edit the original message via the component interaction webhook
   const rest = new REST({ version: "10" });

@@ -18,6 +18,8 @@ import type {
   CampaignDeleteRequestedEvent,
 } from "../messaging/events";
 
+import { formatDuration } from "../recurrence";
+
 export const data = new SlashCommandBuilder()
   .setName("campaign")
   .setDescription("Manage TTRPG campaigns for this channel")
@@ -50,6 +52,13 @@ export const data = new SlashCommandBuilder()
           .setName("timezone")
           .setDescription(`IANA timezone, e.g. Europe/Rome (default: ${CONFIG.DEFAULT_TIMEZONE})`)
           .setRequired(false),
+      )
+      .addIntegerOption((opt) =>
+        opt
+          .setName("recurrence")
+          .setDescription("Repeat every N days (e.g. 7 = weekly, 14 = biweekly)")
+          .setRequired(false)
+          .setMinValue(1),
       ),
   )
   .addSubcommand((sub) =>
@@ -87,6 +96,13 @@ export const data = new SlashCommandBuilder()
           .setName("timezone")
           .setDescription("New IANA timezone, e.g. Europe/Rome")
           .setRequired(false),
+      )
+      .addIntegerOption((opt) =>
+        opt
+          .setName("recurrence")
+          .setDescription("Repeat every N days (e.g. 7 = weekly, 14 = biweekly), 0 to disable")
+          .setRequired(false)
+          .setMinValue(0),
       ),
   )
   .addSubcommand((sub) =>
@@ -141,6 +157,8 @@ async function handleCreate(
   const vtt = interaction.options.getString("vtt") ?? "";
   const playerCount = interaction.options.getInteger("players", true);
   const timezone = interaction.options.getString("timezone") ?? CONFIG.DEFAULT_TIMEZONE;
+  const recurrenceDays = interaction.options.getInteger("recurrence");
+  const recurrence = recurrenceDays ? `P${recurrenceDays}D` : undefined;
 
   const campaign: Campaign = {
     id: randomUUID().slice(0, 8),
@@ -152,6 +170,7 @@ async function handleCreate(
     sessionCounter: 0,
     createdBy: interaction.user.id,
     timezone,
+    recurrence,
   };
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
@@ -197,6 +216,12 @@ async function handleEdit(
   const newVtt = interaction.options.getString("vtt");
   const newPlayerCount = interaction.options.getInteger("players");
   const newTimezone = interaction.options.getString("timezone");
+  const newRecurrenceDays = interaction.options.getInteger("recurrence");
+  const newRecurrence = newRecurrenceDays === null
+    ? null
+    : newRecurrenceDays === 0
+      ? "off"
+      : `P${newRecurrenceDays}D`;
 
   await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
@@ -209,6 +234,7 @@ async function handleEdit(
       newVtt,
       newPlayerCount,
       newTimezone,
+      newRecurrence,
       interactionToken: interaction.token,
       applicationId: interaction.applicationId,
     },
@@ -237,7 +263,8 @@ async function handleList(interaction: ChatInputCommandInteraction) {
           const vtt = c.vttLink ? `🔗 [VTT](${c.vttLink})` : "*(no VTT link)*";
           const tz = c.timezone ? `🕐 ${c.timezone}` : "🕐 UTC";
           const players = c.playerCount ? `${c.playerCount} players` : "*(no player count)*";
-          return `**${c.name}** — ${c.sessionCounter} session(s) · ${players}\n${vtt} | ${tz} | ID: \`${c.id}\``;
+          const recur = c.recurrence ? `🔁 every ${formatDuration(c.recurrence)}` : "";
+          return `**${c.name}** — ${c.sessionCounter} session(s) · ${players}${recur ? " · " + recur : ""}\n${vtt} | ${tz} | ID: \`${c.id}\``;
         })
         .join("\n\n"),
     );
@@ -284,3 +311,5 @@ async function handleDelete(
     },
   );
 }
+
+// ── Helpers ───────────────────────────────────────────────

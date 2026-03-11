@@ -18,6 +18,8 @@ export interface Campaign {
   createdBy: string;
   /** IANA timezone for sessions in this campaign, e.g. "Europe/Rome" */
   timezone: string;
+  /** ISO 8601 duration for session recurrence, e.g. "P7D" (weekly), "P14D" (biweekly) */
+  recurrence?: string;
 }
 
 // ── Pluggable store (set once at startup via initCampaignStore) ──
@@ -35,6 +37,12 @@ export function initCampaignStore(s: CampaignStore): void {
 /** Return all stored campaigns */
 export async function getCampaigns(): Promise<Campaign[]> {
   return store.getCampaigns();
+}
+
+/** Find a single campaign by ID (returns undefined if not found) */
+export async function getCampaign(id: string): Promise<Campaign | undefined> {
+  const all = await store.getCampaigns();
+  return all.find((c) => c.id === id);
 }
 
 /** Add a new campaign and persist */

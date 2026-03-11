@@ -6,6 +6,8 @@ import {
   time,
 } from "discord.js";
 import type { Session } from "./sessions";
+import { getCampaign } from "./campaigns";
+import { formatDuration } from "./recurrence";
 
 /** Custom ID prefix used for the Attend button */
 export const ATTEND_BUTTON_PREFIX = "attend_";
@@ -15,9 +17,9 @@ export const DECLINE_BUTTON_PREFIX = "decline_";
 /**
  * Build the session card embed and Attend / Don't Attend action row.
  */
-export function buildSessionCard(
+export async function buildSessionCard(
   session: Session,
-): { embed: EmbedBuilder; row: ActionRowBuilder<ButtonBuilder> } {
+): Promise<{ embed: EmbedBuilder; row: ActionRowBuilder<ButtonBuilder> }> {
   const d = new Date(session.date);
   const attendCount = session.rsvps.length;
   const declinedCount = (session.declined ?? []).length;
@@ -50,6 +52,14 @@ export function buildSessionCard(
 
   if (session.vttLink) {
     fields.push({ name: "🗺️ VTT", value: session.vttLink });
+  }
+
+  // Show recurrence indicator if this session belongs to a recurring campaign
+  if (session.campaignId) {
+    const campaign = await getCampaign(session.campaignId);
+    if (campaign?.recurrence) {
+      fields.push({ name: "🔁 Repeats", value: `Every ${formatDuration(campaign.recurrence)}` });
+    }
   }
 
   fields.push({ name: "ID", value: `\`${session.id}\``, inline: true } as any);

@@ -12,6 +12,7 @@ import { REST } from "discord.js";
 import { addSession } from "../sessions";
 import { buildSessionCard } from "../session-card";
 import { Subjects } from "../messaging/events";
+import { CONFIG } from "../config";
 import type {
   SessionCreateRequestedEvent,
   SessionCreatedEvent,
@@ -32,23 +33,30 @@ export async function startSessionCreateConsumer(messaging: MessagingPort): Prom
         applicationId,
       } = envelope.data;
 
-      const { embed, row } = buildSessionCard(session);
+      const { embed, row } = await buildSessionCard(session);
       embed.setFooter({ text: `Created by ${createdByDisplayName}` });
 
-      // Edit the deferred interaction reply via Discord's webhook API
-      const rest = new REST({ version: "10" });
-      // No token needed — interaction webhook endpoints don't require bot auth
-      const webhookUrl = `/webhooks/${applicationId}/${interactionToken}/messages/@original` as const;
-
+      const rest = new REST({ version: "10" }).setToken(CONFIG.TOKEN);
       const body = {
         embeds: [embed.toJSON()],
         components: [row.toJSON()],
       };
 
-      const response = await rest.patch(webhookUrl, { body, auth: false }) as { id: string };
+      let messageId: string;
+
+      if (interactionToken && applicationId) {
+        // Normal flow: edit the deferred interaction reply
+        const webhookUrl = `/webhooks/${applicationId}/${interactionToken}/messages/@original` as const;
+        const response = await rest.patch(webhookUrl, { body, auth: false }) as { id: string };
+        messageId = response.id;
+      } else {
+        // Auto-created by scheduler (no interaction) — post directly to the channel
+        const response = await rest.post(`/channels/${session.channelId}/messages`, { body }) as { id: string };
+        messageId = response.id;
+      }
 
       // Persist the session with the Discord message ID
-      const persisted = { ...session, messageId: response.id };
+      const persisted = { ...session, messageId };
       await addSession(persisted);
 
       // Publish the downstream notification event

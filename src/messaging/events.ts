@@ -183,6 +183,7 @@ export interface CampaignEditRequestedEvent extends InteractionContext {
   newVtt: string | null;
   newPlayerCount: number | null;
   newTimezone: string | null;
+  newRecurrence: string | null;
 }
 
 export interface CampaignDeleteRequestedEvent extends InteractionContext {

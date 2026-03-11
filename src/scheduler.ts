@@ -2,6 +2,8 @@ import cron from "node-cron";
 import { Client, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, time } from "discord.js";
 import type { SendableChannels } from "discord.js";
 import { getSessions, updateSession, removeSession, type Session } from "./sessions";
+import { getCampaign, nextSessionNumber } from "./campaigns";
+import { computeNextSessionDate } from "./recurrence";
 import { checkReschedulePolls } from "./reschedule-poll";
 import type { MessagingPort } from "./messaging/port";
 import { Subjects } from "./messaging/events";
@@ -9,6 +11,7 @@ import type {
   Reminder24hSentEvent,
   ReminderStartSentEvent,
   SessionCleanedUpEvent,
+  SessionCreateRequestedEvent,
 } from "./messaging/events";
 
 const ONE_DAY_MS = 24 * 60 * 60 * 1000;
@@ -56,6 +59,12 @@ async function checkReminders(client: Client, messaging?: MessagingPort) {
     // Cleanup old sessions (1 hour after start)
     if (timeUntil < -60 * 60 * 1000) {
       console.log(`[scheduler] Cleaning up old session "${session.title}" (${session.id})`);
+
+      // Auto-create next session if campaign has recurrence
+      if (session.campaignId && messaging) {
+        await maybeCreateNextRecurringSession(session, messaging);
+      }
+
       await removeSession(session.id);
       await messaging?.publish<SessionCleanedUpEvent>(Subjects.SESSION_CLEANED_UP, {
         sessionId: session.id,
@@ -144,6 +153,74 @@ async function sendStartReminder(client: Client, session: Session, messaging?: M
     title: session.title,
     channelId: session.channelId,
   });
+}
+
+// ── Recurrence ────────────────────────────────────────────
+
+import { randomUUID } from "node:crypto";
+
+async function maybeCreateNextRecurringSession(
+  session: Session,
+  messaging: MessagingPort,
+): Promise<void> {
+  const campaign = await getCampaign(session.campaignId);
+  if (!campaign?.recurrence) return;
+
+  // Skip if the campaign already has another upcoming session
+  const allSessions = await getSessions();
+  const hasUpcoming = allSessions.some(
+    (s) => s.campaignId === campaign.id && s.id !== session.id && new Date(s.date).getTime() > Date.now(),
+  );
+  if (hasUpcoming) {
+    console.log(`[scheduler] Campaign "${campaign.name}" already has an upcoming session — skipping auto-create`);
+    return;
+  }
+
+  // Use the original (pre-reschedule) date to keep the cadence stable
+  const referenceDate = session.originalDate ?? session.date;
+  const nextDate = computeNextSessionDate(referenceDate, campaign.recurrence);
+
+  // Guard: don't create a session in the past (e.g. if bot was offline for a long time)
+  if (new Date(nextDate).getTime() < Date.now()) {
+    console.warn(`[scheduler] Skipping auto-create for "${campaign.name}" — next date ${nextDate} is in the past`);
+    return;
+  }
+
+  const sessionNum = await nextSessionNumber(campaign.id);
+  const title = `${campaign.name} — Session ${sessionNum}`;
+  const id = randomUUID().slice(0, 8);
+
+  const nextSession = {
+    id,
+    guildId: session.guildId,
+    channelId: session.channelId,
+    title,
+    date: nextDate,
+    createdBy: session.createdBy,
+    campaignId: campaign.id,
+    vttLink: campaign.vttLink,
+    playerCount: campaign.playerCount,
+    messageId: "" as const,
+    rsvps: [] as string[],
+    declined: [] as string[],
+    rescheduleActive: false,
+    rescheduleMessageId: "",
+    reminded24h: false,
+    remindedStart: false,
+  };
+
+  await messaging.publish<SessionCreateRequestedEvent>(
+    Subjects.SESSION_CREATE_REQUESTED,
+    {
+      session: nextSession,
+      createdByDisplayName: "Scheduler (auto-repeat)",
+      // No interaction to edit — the consumer will post a new message
+      interactionToken: "",
+      applicationId: "",
+    },
+  );
+
+  console.log(`[scheduler] Auto-created recurring session "${title}" for ${nextDate}`);
 }
 
 async function resolveTextChannel(

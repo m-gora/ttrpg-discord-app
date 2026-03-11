@@ -32,6 +32,8 @@ export interface Session {
   reminded24h: boolean;
   /** Whether the "starting now" reminder has been sent */
   remindedStart: boolean;
+  /** Original date before any reschedule — used to keep recurrence cadence stable */
+  originalDate?: string;
 }
 
 // ── Pluggable store (set once at startup via initSessionStore) ──

@@ -75,20 +75,22 @@ function shouldSendStartReminder(session: { remindedStart: boolean }, timeUntil:
 
 async function send24hReminder(client: Client, session: Session, messaging?: MessagingPort) {
   const channel = await resolveTextChannel(client, session.channelId);
-  if (channel) {
-    const d = new Date(session.date);
-    const embed = new EmbedBuilder()
-      .setTitle("⏰ Session Tomorrow!")
-      .setColor(0xfee75c)
-      .setDescription(
-        `**${session.title}** is happening tomorrow!\n\n` +
-          `📅 ${time(d, "F")} (${time(d, "R")})`,
-      );
-    await channel.send({ content: "@everyone", embeds: [embed] });
-    console.log(`[scheduler] 24h reminder sent for "${session.title}" in channel ${session.channelId}`);
-  } else {
-    console.warn(`[scheduler] Could not resolve channel ${session.channelId} for 24h reminder of "${session.title}"`);
+  if (!channel) {
+    console.warn(`[scheduler] Could not resolve channel ${session.channelId} for 24h reminder of "${session.title}" — will retry next cycle`);
+    return;
   }
+
+  const d = new Date(session.date);
+  const embed = new EmbedBuilder()
+    .setTitle("⏰ Session Tomorrow!")
+    .setColor(0xfee75c)
+    .setDescription(
+      `**${session.title}** is happening tomorrow!\n\n` +
+        `📅 ${time(d, "F")} (${time(d, "R")})`,
+    );
+  await channel.send({ content: "@everyone", embeds: [embed] });
+  console.log(`[scheduler] 24h reminder sent for "${session.title}" in channel ${session.channelId}`);
+
   session.reminded24h = true;
   await updateSession(session);
 
@@ -131,7 +133,8 @@ async function sendStartReminder(client: Client, session: Session, messaging?: M
     await channel.send({ content: mentions, embeds: [embed], components });
     console.log(`[scheduler] Start reminder sent for "${session.title}" in channel ${session.channelId}`);
   } else {
-    console.warn(`[scheduler] Could not resolve channel ${session.channelId} for start reminder of "${session.title}"`);
+    console.warn(`[scheduler] Could not resolve channel ${session.channelId} for start reminder of "${session.title}" — will retry next cycle`);
+    return;
   }
   session.remindedStart = true;
   await updateSession(session);

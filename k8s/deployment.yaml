@@ -20,13 +20,13 @@ spec:
       automountServiceAccountToken: false
       containers:
         - name: bot
-          image: ghcr.io/m-gora/ttrpg-discord-app:1.0.6
+          image: ghcr.io/m-gora/ttrpg-discord-app:1.1.4
           imagePullPolicy: IfNotPresent
           envFrom:
             - secretRef:
                 name: ttrpg-discord-app
             - configMapRef:
-                name: ttrpg-discord-app
+                name: ttrpg-discord-app-conf
           volumeMounts:
             - name: data
               mountPath: /data

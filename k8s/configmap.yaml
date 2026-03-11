@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: ttrpg-discord-app
+  name: ttrpg-discord-app-conf
   namespace: ttrpg
   labels:
     app.kubernetes.io/name: ttrpg-discord-app

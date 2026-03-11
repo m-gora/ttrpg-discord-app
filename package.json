@@ -5,6 +5,9 @@
   "private": true,
   "scripts": {
     "start": "bun run index.ts",
+    "dev": "bun --watch run index.ts",
+    "dev:debug-memory": "bun --smol --max-old-space-size=256 run index.ts",
+    "dev:nats": "docker run -d --rm --name nats-dev -p 4222:4222 -p 8222:8222 nats:latest -js -m 8222 && NATS_URL=nats://localhost:4222 bun --watch run index.ts; docker stop nats-dev",
     "deploy": "bun run src/deploy-commands.ts"
   },
   "devDependencies": {

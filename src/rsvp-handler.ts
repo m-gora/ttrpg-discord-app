@@ -1,21 +1,17 @@
 import { type ButtonInteraction, MessageFlags } from "discord.js";
-import { type Session, getSessions, updateSession } from "./sessions";
+import { getSessions } from "./sessions";
 import {
   ATTEND_BUTTON_PREFIX,
   DECLINE_BUTTON_PREFIX,
-  buildSessionCard,
-  countChannelMembers,
 } from "./session-card";
-import { openReschedulePoll } from "./reschedule-poll";
 import type { MessagingPort } from "./messaging/port";
 import { Subjects } from "./messaging/events";
-import type { RsvpAttendedEvent, RsvpDeclinedEvent } from "./messaging/events";
+import type { RsvpAttendRequestedEvent, RsvpDeclineRequestedEvent } from "./messaging/events";
 
 /**
  * Handle Attend / Don't Attend button clicks.
- * - "Attend" adds the user to rsvps (removes from declined if present).
- * - "Don't Attend" adds the user to declined (removes from rsvps if present)
- *   and triggers a reschedule poll on the first cancellation.
+ * Validates the session exists, defers the button update, and publishes
+ * a command event for the consumer to process.
  */
 export async function handleRsvpButton(
   interaction: ButtonInteraction,
@@ -26,6 +22,14 @@ export async function handleRsvpButton(
   const isAttend = customId.startsWith(ATTEND_BUTTON_PREFIX);
   const isDecline = customId.startsWith(DECLINE_BUTTON_PREFIX);
   if (!isAttend && !isDecline) return;
+
+  if (!messaging) {
+    await interaction.reply({
+      content: "❌ Messaging is not configured — RSVPs require NATS.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
 
   const prefix = isAttend ? ATTEND_BUTTON_PREFIX : DECLINE_BUTTON_PREFIX;
   const sessionId = customId.slice(prefix.length);
@@ -45,86 +49,43 @@ export async function handleRsvpButton(
 
   const userId = interaction.user.id;
 
-  if (isAttend) {
-    const earlyReply = handleAttend(session, userId);
-    if (earlyReply) {
-      await interaction.reply({ content: earlyReply, flags: MessageFlags.Ephemeral });
-      return;
-    }
-    await messaging?.publish<RsvpAttendedEvent>(Subjects.RSVP_ATTENDED, {
-      sessionId: session.id,
-      userId,
-      totalAttending: session.rsvps.length,
-    });
-  } else {
-    const earlyReply = await handleDecline(session, userId, interaction, messaging);
-    if (earlyReply) {
-      await interaction.reply({ content: earlyReply, flags: MessageFlags.Ephemeral });
-      return;
-    }
-    await messaging?.publish<RsvpDeclinedEvent>(Subjects.RSVP_DECLINED, {
-      sessionId: session.id,
-      userId,
-      totalDeclined: session.declined.length,
-    });
+  // Early-out for duplicate actions
+  if (isAttend && session.rsvps.includes(userId)) {
+    await interaction.reply({ content: "You're already marked as attending!", flags: MessageFlags.Ephemeral });
+    return;
   }
-
-  await updateSession(session);
-
-  // Rebuild the embed with updated info
-  const channel = interaction.channel;
-  if (!channel) {
-    await interaction.reply({
-      content: isAttend ? "✅ You're attending!" : "❌ Marked as can't make it.",
-      flags: MessageFlags.Ephemeral,
-    });
+  if (isDecline && session.declined.includes(userId)) {
+    await interaction.reply({ content: "You've already indicated you can't make it.", flags: MessageFlags.Ephemeral });
     return;
   }
 
-  const memberCount = await countChannelMembers(channel);
-  const { embed, row } = buildSessionCard(session, memberCount);
-  await interaction.update({ embeds: [embed], components: [row] });
-}
+  // Defer the component update — the consumer will edit the card
+  await interaction.deferUpdate();
 
-/** Returns an ephemeral reply string if the user is already attending, or null to continue. */
-function handleAttend(session: Session, userId: string): string | null {
-  if (session.rsvps.includes(userId)) {
-    return "You're already marked as attending!";
+  if (isAttend) {
+    await messaging.publish<RsvpAttendRequestedEvent>(
+      Subjects.RSVP_ATTEND_REQUESTED,
+      {
+        sessionId: session.id,
+        userId,
+        channelId: interaction.channelId,
+        sessionMessageId: session.messageId,
+        interactionToken: interaction.token,
+        applicationId: interaction.applicationId,
+      },
+    );
+  } else {
+    await messaging.publish<RsvpDeclineRequestedEvent>(
+      Subjects.RSVP_DECLINE_REQUESTED,
+      {
+        sessionId: session.id,
+        userId,
+        userDisplayName: interaction.user.displayName,
+        channelId: interaction.channelId,
+        sessionMessageId: session.messageId,
+        interactionToken: interaction.token,
+        applicationId: interaction.applicationId,
+      },
+    );
   }
-  session.declined = session.declined.filter((id) => id !== userId);
-  session.rsvps.push(userId);
-  return null;
-}
-
-/** Returns an ephemeral reply string if the user already declined, or null to continue. */
-async function handleDecline(
-  session: Session,
-  userId: string,
-  interaction: ButtonInteraction,
-  messaging?: MessagingPort,
-): Promise<string | null> {
-  if (session.declined.includes(userId)) {
-    return "You've already indicated you can't make it.";
-  }
-
-  session.rsvps = session.rsvps.filter((id) => id !== userId);
-  session.declined.push(userId);
-
-  // Save so the reschedule poll sees updated state
-  await updateSession(session);
-
-  // Trigger reschedule poll on the first cancellation
-  if (!session.rescheduleActive && interaction.channelId) {
-    const channel = await interaction.client.channels.fetch(interaction.channelId);
-    if (channel?.isSendable()) {
-      await openReschedulePoll(
-        channel,
-        session,
-        interaction.user.displayName,
-        messaging,
-      );
-    }
-  }
-
-  return null;
 }

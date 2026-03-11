@@ -9,15 +9,13 @@ import {
 } from "discord.js";
 import { randomUUID } from "node:crypto";
 import {
-  addSession,
   getUpcomingSessions,
-  removeSession,
 } from "../sessions";
-import { buildSessionCard, countChannelMembers } from "../session-card";
-import { getChannelCampaigns, nextSessionNumber, decrementSessionCounter } from "../campaigns";
+import { countChannelMembers } from "../session-card";
+import { getChannelCampaigns, nextSessionNumber } from "../campaigns";
 import type { MessagingPort } from "../messaging/port";
 import { Subjects } from "../messaging/events";
-import type { SessionCreatedEvent, SessionCancelledEvent } from "../messaging/events";
+import type { SessionCreateRequestedEvent, SessionCancelRequestedEvent } from "../messaging/events";
 
 export const data = new SlashCommandBuilder()
   .setName("session")
@@ -98,6 +96,14 @@ async function handleCreate(
   interaction: ChatInputCommandInteraction,
   messaging?: MessagingPort,
 ) {
+  if (!messaging) {
+    await interaction.reply({
+      content: "❌ Messaging is not configured — session creation requires NATS.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   const titleOpt = interaction.options.getString("title");
   const dateStr = interaction.options.getString("date", true);
   const tz = interaction.options.getString("timezone") ?? "UTC";
@@ -172,7 +178,7 @@ async function handleCreate(
     createdBy: interaction.user.id,
     campaignId,
     vttLink,
-    messageId: "", // will be set after sending
+    messageId: "" as const,
     rsvps: [] as string[],
     declined: [] as string[],
     rescheduleActive: false,
@@ -184,18 +190,19 @@ async function handleCreate(
   // Count non-bot members who can see this channel
   const memberCount = await countChannelMembers(channel);
 
-  const { embed, row } = buildSessionCard(session, memberCount);
-  embed.setFooter({ text: `Created by ${interaction.user.displayName}` });
+  // Defer the reply — the consumer will edit it once it processes the event
+  await interaction.deferReply();
 
-  // Reply with the card in the channel (visible to everyone)
-  await interaction.reply({ embeds: [embed], components: [row] });
-  const reply = await interaction.fetchReply();
-
-  // Store the message ID so we can edit the card later on RSVP
-  session.messageId = reply.id;
-  await addSession(session);
-
-  await messaging?.publish<SessionCreatedEvent>(Subjects.SESSION_CREATED, { session });
+  await messaging.publish<SessionCreateRequestedEvent>(
+    Subjects.SESSION_CREATE_REQUESTED,
+    {
+      session,
+      memberCount,
+      createdByDisplayName: interaction.user.displayName,
+      interactionToken: interaction.token,
+      applicationId: interaction.applicationId,
+    },
+  );
 }
 
 // ── List ──────────────────────────────────────────────────
@@ -224,7 +231,7 @@ async function handleList(interaction: ChatInputCommandInteraction) {
         .join("\n\n"),
     );
 
-  await interaction.reply({ embeds: [embed] });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 // ── Cancel ────────────────────────────────────────────────
@@ -233,6 +240,14 @@ async function handleCancel(
   interaction: ChatInputCommandInteraction,
   messaging?: MessagingPort,
 ) {
+  if (!messaging) {
+    await interaction.reply({
+      content: "❌ Messaging is not configured — session cancellation requires NATS.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   const id = interaction.options.getString("id", true);
   const sessions = await getUpcomingSessions(interaction.guildId ?? "");
   const session = sessions.find((s) => s.id === id);
@@ -245,20 +260,18 @@ async function handleCancel(
     return;
   }
 
-  // If this session belongs to a campaign, give the session number back
-  if (session.campaignId) {
-    await decrementSessionCounter(session.campaignId);
-  }
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  await removeSession(id);
-  await interaction.reply(`🗑️ Session **${session.title}** has been cancelled.`);
-
-  await messaging?.publish<SessionCancelledEvent>(Subjects.SESSION_CANCELLED, {
-    sessionId: id,
-    cancelledBy: interaction.user.id,
-    title: session.title,
-    campaignId: session.campaignId,
-  });
+  await messaging.publish<SessionCancelRequestedEvent>(
+    Subjects.SESSION_CANCEL_REQUESTED,
+    {
+      sessionId: id,
+      guildId: interaction.guildId ?? "",
+      cancelledBy: interaction.user.id,
+      interactionToken: interaction.token,
+      applicationId: interaction.applicationId,
+    },
+  );
 }
 
 // ── Helpers ───────────────────────────────────────────────

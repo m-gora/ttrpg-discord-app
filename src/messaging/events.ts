@@ -11,13 +11,21 @@ import type { Campaign } from "../campaigns";
 // ── Subject constants ─────────────────────────────────────
 
 export const Subjects = {
+  // Session commands (inbound — trigger side effects)
+  SESSION_CREATE_REQUESTED: "session.create.requested",
+  SESSION_CANCEL_REQUESTED: "session.cancel.requested",
+
   // Session lifecycle
   SESSION_CREATED: "session.created",
   SESSION_CANCELLED: "session.cancelled",
   SESSION_RESCHEDULED: "session.rescheduled",
   SESSION_CLEANED_UP: "session.cleaned_up",
 
-  // RSVP
+  // RSVP commands (inbound)
+  RSVP_ATTEND_REQUESTED: "rsvp.attend.requested",
+  RSVP_DECLINE_REQUESTED: "rsvp.decline.requested",
+
+  // RSVP lifecycle
   RSVP_ATTENDED: "rsvp.attended",
   RSVP_DECLINED: "rsvp.declined",
 
@@ -29,6 +37,11 @@ export const Subjects = {
   RESCHEDULE_POLL_OPENED: "reschedule.poll_opened",
   RESCHEDULE_POLL_RESOLVED: "reschedule.poll_resolved",
 
+  // Campaign commands (inbound)
+  CAMPAIGN_CREATE_REQUESTED: "campaign.create.requested",
+  CAMPAIGN_EDIT_REQUESTED: "campaign.edit.requested",
+  CAMPAIGN_DELETE_REQUESTED: "campaign.delete.requested",
+
   // Campaign lifecycle
   CAMPAIGN_CREATED: "campaign.created",
   CAMPAIGN_UPDATED: "campaign.updated",
@@ -38,6 +51,20 @@ export const Subjects = {
 export type Subject = (typeof Subjects)[keyof typeof Subjects];
 
 // ── Payloads ──────────────────────────────────────────────
+
+/** Command event — carries everything the consumer needs to create a session */
+export interface SessionCreateRequestedEvent {
+  /** Pre-built session object (without messageId — set by the consumer) */
+  session: Omit<Session, "messageId"> & { messageId: "" };
+  /** Number of non-bot members in the channel (for the RSVP card) */
+  memberCount: number;
+  /** Display name of the user who ran the command (for the embed footer) */
+  createdByDisplayName: string;
+  /** Discord interaction token — needed to edit the deferred reply */
+  interactionToken: string;
+  /** Discord application ID — needed for the webhook URL */
+  applicationId: string;
+}
 
 export interface SessionCreatedEvent {
   session: Session;
@@ -113,5 +140,53 @@ export interface CampaignUpdatedEvent {
 export interface CampaignDeletedEvent {
   campaignId: string;
   name: string;
+  deletedBy: string;
+}
+
+// ── Command event payloads ────────────────────────────────
+
+/** Shared context needed to edit a deferred interaction reply */
+export interface InteractionContext {
+  interactionToken: string;
+  applicationId: string;
+}
+
+export interface SessionCancelRequestedEvent extends InteractionContext {
+  sessionId: string;
+  guildId: string;
+  cancelledBy: string;
+}
+
+export interface RsvpAttendRequestedEvent extends InteractionContext {
+  sessionId: string;
+  userId: string;
+  channelId: string;
+  /** The message ID of the session card (for updating via channel message edit) */
+  sessionMessageId: string;
+}
+
+export interface RsvpDeclineRequestedEvent extends InteractionContext {
+  sessionId: string;
+  userId: string;
+  userDisplayName: string;
+  channelId: string;
+  sessionMessageId: string;
+}
+
+export interface CampaignCreateRequestedEvent extends InteractionContext {
+  campaign: Campaign;
+  createdByDisplayName: string;
+}
+
+export interface CampaignEditRequestedEvent extends InteractionContext {
+  campaignId: string;
+  channelId: string;
+  newName: string | null;
+  newVtt: string | null;
+}
+
+export interface CampaignDeleteRequestedEvent extends InteractionContext {
+  campaignId: string;
+  channelId: string;
   deletedBy: string;
 }

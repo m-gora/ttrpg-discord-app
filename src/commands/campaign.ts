@@ -8,18 +8,15 @@ import {
 } from "discord.js";
 import { randomUUID } from "node:crypto";
 import {
-  addCampaign,
   getChannelCampaigns,
-  updateCampaign,
-  removeCampaign,
   type Campaign,
 } from "../campaigns";
 import type { MessagingPort } from "../messaging/port";
 import { Subjects } from "../messaging/events";
 import type {
-  CampaignCreatedEvent,
-  CampaignUpdatedEvent,
-  CampaignDeletedEvent,
+  CampaignCreateRequestedEvent,
+  CampaignEditRequestedEvent,
+  CampaignDeleteRequestedEvent,
 } from "../messaging/events";
 
 export const data = new SlashCommandBuilder()
@@ -114,6 +111,14 @@ async function handleCreate(
   interaction: ChatInputCommandInteraction,
   messaging?: MessagingPort,
 ) {
+  if (!messaging) {
+    await interaction.reply({
+      content: "❌ Messaging is not configured — campaign creation requires NATS.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   const name = interaction.options.getString("name", true);
   const vtt = interaction.options.getString("vtt") ?? "";
 
@@ -127,22 +132,17 @@ async function handleCreate(
     createdBy: interaction.user.id,
   };
 
-  await addCampaign(campaign);
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  await messaging?.publish<CampaignCreatedEvent>(Subjects.CAMPAIGN_CREATED, { campaign });
-
-  const embed = new EmbedBuilder()
-    .setTitle("📖 Campaign Created")
-    .setColor(0x5865f2)
-    .addFields(
-      { name: "Name", value: campaign.name, inline: true },
-      { name: "ID", value: `\`${campaign.id}\``, inline: true },
-      { name: "VTT", value: campaign.vttLink || "*not set*", inline: true },
-      { name: "Sessions so far", value: "0", inline: true },
-    )
-    .setFooter({ text: `Created by ${interaction.user.displayName}` });
-
-  await interaction.reply({ embeds: [embed] });
+  await messaging.publish<CampaignCreateRequestedEvent>(
+    Subjects.CAMPAIGN_CREATE_REQUESTED,
+    {
+      campaign,
+      createdByDisplayName: interaction.user.displayName,
+      interactionToken: interaction.token,
+      applicationId: interaction.applicationId,
+    },
+  );
 }
 
 // ── Edit ──────────────────────────────────────────────────
@@ -151,6 +151,14 @@ async function handleEdit(
   interaction: ChatInputCommandInteraction,
   messaging?: MessagingPort,
 ) {
+  if (!messaging) {
+    await interaction.reply({
+      content: "❌ Messaging is not configured — campaign editing requires NATS.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   const id = interaction.options.getString("id", true);
   const campaigns = await getChannelCampaigns(interaction.channelId);
   const campaign = campaigns.find((c) => c.id === id);
@@ -166,29 +174,19 @@ async function handleEdit(
   const newName = interaction.options.getString("name");
   const newVtt = interaction.options.getString("vtt");
 
-  if (newName) campaign.name = newName;
-  if (newVtt !== null && newVtt !== undefined) campaign.vttLink = newVtt;
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  const updatedFields: string[] = [];
-  if (newName) updatedFields.push("name");
-  if (newVtt !== null && newVtt !== undefined) updatedFields.push("vttLink");
-
-  await updateCampaign(campaign);
-
-  await messaging?.publish<CampaignUpdatedEvent>(Subjects.CAMPAIGN_UPDATED, {
-    campaign,
-    updatedFields,
-  });
-
-  const embed = new EmbedBuilder()
-    .setTitle("✏️ Campaign Updated")
-    .setColor(0x57f287)
-    .addFields(
-      { name: "Name", value: campaign.name, inline: true },
-      { name: "VTT", value: campaign.vttLink || "*not set*", inline: true },
-    );
-
-  await interaction.reply({ embeds: [embed] });
+  await messaging.publish<CampaignEditRequestedEvent>(
+    Subjects.CAMPAIGN_EDIT_REQUESTED,
+    {
+      campaignId: id,
+      channelId: interaction.channelId,
+      newName,
+      newVtt,
+      interactionToken: interaction.token,
+      applicationId: interaction.applicationId,
+    },
+  );
 }
 
 // ── List ──────────────────────────────────────────────────
@@ -216,7 +214,7 @@ async function handleList(interaction: ChatInputCommandInteraction) {
         .join("\n\n"),
     );
 
-  await interaction.reply({ embeds: [embed] });
+  await interaction.reply({ embeds: [embed], flags: MessageFlags.Ephemeral });
 }
 
 // ── Delete ────────────────────────────────────────────────
@@ -225,6 +223,14 @@ async function handleDelete(
   interaction: ChatInputCommandInteraction,
   messaging?: MessagingPort,
 ) {
+  if (!messaging) {
+    await interaction.reply({
+      content: "❌ Messaging is not configured — campaign deletion requires NATS.",
+      flags: MessageFlags.Ephemeral,
+    });
+    return;
+  }
+
   const id = interaction.options.getString("id", true);
   const campaigns = await getChannelCampaigns(interaction.channelId);
   const campaign = campaigns.find((c) => c.id === id);
@@ -237,13 +243,16 @@ async function handleDelete(
     return;
   }
 
-  await removeCampaign(id);
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
-  await messaging?.publish<CampaignDeletedEvent>(Subjects.CAMPAIGN_DELETED, {
-    campaignId: id,
-    name: campaign.name,
-    deletedBy: interaction.user.id,
-  });
-
-  await interaction.reply(`🗑️ Campaign **${campaign.name}** has been deleted.`);
+  await messaging.publish<CampaignDeleteRequestedEvent>(
+    Subjects.CAMPAIGN_DELETE_REQUESTED,
+    {
+      campaignId: id,
+      channelId: interaction.channelId,
+      deletedBy: interaction.user.id,
+      interactionToken: interaction.token,
+      applicationId: interaction.applicationId,
+    },
+  );
 }

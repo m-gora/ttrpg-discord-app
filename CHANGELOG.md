@@ -1,3 +1,9 @@
+## [1.3.0](https://github.com/m-gora/ttrpg-discord-app/compare/v1.2.0...v1.3.0) (2026-05-20)
+
+### Features
+
+* releae version bump ([ca25224](https://github.com/m-gora/ttrpg-discord-app/commit/ca25224ec357687e3725abfc2667e8765b8c82a2))
+
 ## [1.2.0](https://github.com/m-gora/ttrpg-discord-app/compare/v1.1.8...v1.2.0) (2026-03-11)
 
 ### Features

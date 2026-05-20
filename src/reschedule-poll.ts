@@ -8,6 +8,8 @@ import {
 import type { Session } from "./sessions";
 import { getSessions, updateSession } from "./sessions";
 import { buildSessionCard } from "./session-card";
+import { getCampaign } from "./campaigns";
+import { parseDurationDays } from "./recurrence";
 import type { MessagingPort } from "./messaging/port";
 import { Subjects } from "./messaging/events";
 import type {
@@ -23,36 +25,74 @@ const MONTH_NAMES = [
 ] as const;
 
 /**
- * Build the 7 candidate dates from the original session's date,
- * each on consecutive days at the same UTC time.
+ * Build candidate dates from the day after `triggerDate` up to (and including)
+ * `endDate`, each at the given UTC hours/minutes.
+ * Capped at 10 entries (Discord poll limit).
  */
-function buildCandidateDates(originalDate: Date): { text: string; date: Date }[] {
-  const hours = originalDate.getUTCHours();
-  const minutes = originalDate.getUTCMinutes();
+function buildCandidateDates(
+  triggerDate: Date,
+  endDate: Date,
+  hours: number,
+  minutes: number,
+): { text: string; date: Date }[] {
   const options: { text: string; date: Date }[] = [];
 
-  for (let i = 1; i <= 7; i++) {
-    const d = new Date(originalDate);
-    d.setUTCDate(d.getUTCDate() + i);
-    d.setUTCHours(hours, minutes, 0, 0);
+  const cursor = new Date(triggerDate);
+  cursor.setUTCDate(cursor.getUTCDate() + 1);
+  cursor.setUTCHours(hours, minutes, 0, 0);
 
-    const dayName = DAY_NAMES[d.getUTCDay()];
-    const monthName = MONTH_NAMES[d.getUTCMonth()];
-    const day = d.getUTCDate();
-    const timeStr = `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")} UTC`;
+  const end = new Date(endDate);
+  end.setUTCHours(hours, minutes, 0, 0);
+
+  while (cursor <= end && options.length < 10) {
+    const dayName = DAY_NAMES[cursor.getUTCDay()];
+    const monthName = MONTH_NAMES[cursor.getUTCMonth()];
+    const day = cursor.getUTCDate();
+    const timeStr = `${String(cursor.getUTCHours()).padStart(2, "0")}:${String(cursor.getUTCMinutes()).padStart(2, "0")} UTC`;
 
     options.push({
       text: `${dayName}, ${monthName} ${day} — ${timeStr}`,
-      date: d,
+      date: new Date(cursor),
     });
+
+    cursor.setUTCDate(cursor.getUTCDate() + 1);
   }
 
   return options;
 }
 
 /**
- * Open a reschedule poll in the channel with up to 7 date options
- * (the next 7 days at the same time as the original session).
+ * Resolve the upper bound for reschedule candidates.
+ * Returns the next regular session slot (originalDate + recurrence days).
+ * Falls back to triggerDate + 7 days when no campaign recurrence is set,
+ * or when the computed slot is already in the past relative to triggerDate.
+ */
+async function resolveNextRegularSlot(session: Session, triggerDate: Date): Promise<Date> {
+  if (session.campaignId) {
+    const campaign = await getCampaign(session.campaignId);
+    if (campaign?.recurrence) {
+      const days = parseDurationDays(campaign.recurrence);
+      if (days > 0) {
+        const originalDate = new Date(session.originalDate ?? session.date);
+        const nextSlot = new Date(originalDate);
+        nextSlot.setUTCDate(nextSlot.getUTCDate() + days);
+        if (nextSlot > triggerDate) {
+          return nextSlot;
+        }
+      }
+    }
+  }
+
+  // Fallback: offer 7 days from trigger
+  const fallback = new Date(triggerDate);
+  fallback.setUTCDate(fallback.getUTCDate() + 7);
+  return fallback;
+}
+
+/**
+ * Open a reschedule poll in the channel.
+ * Offers one option per day from tomorrow (relative to when the decline happened)
+ * up to the next regular recurrence slot, at the same time as the original session.
  */
 export async function openReschedulePoll(
   channel: SendableChannels,
@@ -63,8 +103,26 @@ export async function openReschedulePoll(
   // Don't open another poll if one is already active
   if (session.rescheduleActive) return;
 
-  const originalDate = new Date(session.date);
-  const options = buildCandidateDates(originalDate);
+  const now = new Date();
+  const originalDate = new Date(session.originalDate ?? session.date);
+  const hours = originalDate.getUTCHours();
+  const minutes = originalDate.getUTCMinutes();
+
+  const nextSlot = await resolveNextRegularSlot(session, now);
+  const options = buildCandidateDates(now, nextSlot, hours, minutes);
+
+  // Safety: ensure at least one option even if the next slot is very close
+  if (options.length === 0) {
+    const tomorrow = new Date(now);
+    tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+    tomorrow.setUTCHours(hours, minutes, 0, 0);
+    options.push({
+      text: `${DAY_NAMES[tomorrow.getUTCDay()]}, ${MONTH_NAMES[tomorrow.getUTCMonth()]} ${tomorrow.getUTCDate()} — ${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")} UTC`,
+      date: tomorrow,
+    });
+  }
+
+  session.rescheduleTriggeredAt = now.toISOString();
 
   const pollMessage = await channel.send({
     content: `📊 **${declinedByUsername}** can't make it to **${session.title}**! Vote for the best reschedule date:`,
@@ -79,7 +137,7 @@ export async function openReschedulePoll(
 
   session.rescheduleActive = true;
   session.rescheduleMessageId = pollMessage.id;
-  await updateSession(session);
+  await updateSession(session); // persists rescheduleTriggeredAt too
 
   await messaging?.publish<ReschedulePollOpenedEvent>(Subjects.RESCHEDULE_POLL_OPENED, {
     sessionId: session.id,
@@ -125,8 +183,15 @@ async function processReschedulePoll(
   const poll = message.poll;
   if (!poll?.resultsFinalized) return;
 
-  // Tally votes: find the answer with the most votes
-  const candidates = buildCandidateDates(new Date(session.date));
+  // Tally votes: reconstruct the exact same candidates that were shown in the poll
+  const originalDate = new Date(session.originalDate ?? session.date);
+  const hours = originalDate.getUTCHours();
+  const minutes = originalDate.getUTCMinutes();
+  const triggerDate = session.rescheduleTriggeredAt
+    ? new Date(session.rescheduleTriggeredAt)
+    : new Date(session.date); // legacy fallback: reproduces the old day+1…day+7 range
+  const nextSlot = await resolveNextRegularSlot(session, triggerDate);
+  const candidates = buildCandidateDates(triggerDate, nextSlot, hours, minutes);
   let bestIdx = 0;
   let bestVotes = 0;
 

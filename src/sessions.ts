@@ -34,6 +34,8 @@ export interface Session {
   remindedStart: boolean;
   /** Original date before any reschedule — used to keep recurrence cadence stable */
   originalDate?: string;
+  /** ISO timestamp of when the reschedule poll was opened — used to reconstruct candidates */
+  rescheduleTriggeredAt?: string;
 }
 
 // ── Pluggable store (set once at startup via initSessionStore) ──
